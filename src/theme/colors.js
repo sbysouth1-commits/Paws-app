@@ -1,25 +1,24 @@
-// Pawsitive Kids brand palette (see spec §2)
+import { MessageCircle, Hand, Wind, Ear } from 'lucide-react-native';
+
+// Design tokens lifted straight from the prototype (app_prototype3.jsx)
 export const colors = {
-  paper: '#FCFAF3', // app background
-  purple: '#5B1F8B', // primary text / headings / Kid Mode accent
-  yellow: '#EDBB0B', // primary CTA / buttons / price tags
-  mauve: '#A085AD', // secondary accent
-  green: '#0E5935', // used sparingly — one category accent only
-
-  // derived tints for card backgrounds
-  purpleTint: '#EFE7F6',
-  yellowTint: '#FBF1CE',
-  mauveTint: '#F1ECF3',
-  greenTint: '#E3EFE8',
-
-  textMuted: '#7A6E86',
-  cardBorder: '#EAE4D8',
+  paper: '#FCFAF3',
+  ink: '#5B1F8B',
+  inkSoft: '#7C5F92',
+  sageLight: '#F1EAF3',
+  sage: '#A085AD',
+  clay: '#EDBB0B',
+  clayLight: '#FBF0C7',
+  gold: '#EDBB0B',
+  rose: '#5B1F8B',
+  roseLight: '#EDE1F5',
+  line: '#E9DFC9',
   white: '#FFFFFF',
 };
 
 export const fonts = {
-  heading: 'Fraunces_700Bold',
-  headingMedium: 'Fraunces_600SemiBold',
+  heading: 'Fraunces_600SemiBold',
+  headingBold: 'Fraunces_700Bold',
   body: 'PublicSans_400Regular',
   bodyMedium: 'PublicSans_500Medium',
   bodySemiBold: 'PublicSans_600SemiBold',
@@ -27,15 +26,11 @@ export const fonts = {
   kid: 'Baloo2_700Bold', // Kid Mode only
 };
 
-// Category → icon (Ionicons) + accent. Green is reserved for exactly one
-// category per the brand rules; everything else stays purple/mauve/yellow.
-export const categories = {
-  Emotions: { icon: 'heart', color: colors.purple, tint: colors.purpleTint },
-  Communication: { icon: 'chatbubbles', color: colors.mauve, tint: colors.mauveTint },
-  'Social Skills': { icon: 'people', color: colors.purple, tint: colors.purpleTint },
-  Sensory: { icon: 'hand-left', color: colors.green, tint: colors.greenTint },
-  'Motor Skills': { icon: 'bicycle', color: colors.mauve, tint: colors.mauveTint },
-  Routines: { icon: 'sunny', color: colors.yellow, tint: colors.yellowTint },
+export const CATEGORY_META = {
+  Speech: { icon: MessageCircle, color: '#7C8FBF' },
+  OT: { icon: Hand, color: '#0E5935' },
+  Sensory: { icon: Wind, color: colors.gold },
+  Behaviour: { icon: Ear, color: colors.ink },
 };
 
-export const categoryList = Object.keys(categories);
+export const categoryList = Object.keys(CATEGORY_META);

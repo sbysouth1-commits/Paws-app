@@ -1,100 +1,95 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, FlatList, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, categories, categoryList } from '../theme/colors';
-import { family, featuredResources } from '../data/mockData';
+import { ChevronRight, Sparkles } from 'lucide-react-native';
+import { CATEGORY_META, colors, fonts } from '../theme/colors';
+import { RESOURCES, family } from '../data/mockData';
 import PawIcon from '../components/PawIcon';
 import ResourceCard from '../components/ResourceCard';
 
 export default function HomeScreen({ navigation }) {
+  const featured = RESOURCES.slice(0, 3);
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Greeting */}
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.greeting}>G'day, {family.parentName}</Text>
-            <Text style={styles.subGreeting}>Let's find something great for {family.childName}</Text>
-          </View>
-          <PawIcon size={40} />
+        {/* Brand row */}
+        <View style={styles.brandRow}>
+          <PawIcon size={16} color={colors.clay} />
+          <Text style={styles.brandText}>Pawsitive Kids</Text>
         </View>
 
-        {/* Kid Mode shortcut */}
-        <Pressable
-          onPress={() => navigation.navigate('KidMode')}
-          style={({ pressed }) => [styles.kidMode, pressed && styles.pressed]}
-        >
-          <View style={styles.kidModeIcon}>
-            <PawIcon size={28} color={colors.paper} />
+        {/* Greeting */}
+        <View style={styles.greetingBlock}>
+          <Text style={styles.greeting}>G'day, {family.parentName} 👋</Text>
+          <Text style={styles.headline}>Resources for {family.childName}</Text>
+        </View>
+
+        {/* Kid Mode card */}
+        <View style={styles.kidCard}>
+          <View style={styles.kidCardText}>
+            <Text style={styles.kicker}>Just for kids</Text>
+            <Text style={styles.cardSub}>Switch to {family.childName}'s simple view</Text>
           </View>
-          <View style={styles.kidModeText}>
-            <Text style={styles.kidModeTitle}>Kid Mode</Text>
-            <Text style={styles.kidModeSub}>Hand the phone to {family.childName}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color={colors.paper} />
-        </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate('KidMode')}
+            style={({ pressed }) => [styles.kidButton, pressed && styles.pressed]}
+          >
+            <Sparkles size={14} color={colors.white} />
+            <Text style={styles.kidButtonText}>Kid Mode</Text>
+          </Pressable>
+        </View>
 
         {/* From the therapist */}
         <Pressable
           onPress={() => navigation.navigate('Tabs', { screen: 'ForChild' })}
-          style={({ pressed }) => [styles.promo, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.promoCard, pressed && styles.pressed]}
         >
-          <View style={styles.promoIcon}>
-            <Ionicons name="gift" size={24} color={colors.purple} />
+          <View style={styles.promoLeft}>
+            <View style={styles.promoIcon}>
+              <PawIcon size={18} color={colors.rose} />
+            </View>
+            <View>
+              <Text style={styles.kicker}>From {family.therapistName}</Text>
+              <Text style={styles.cardSub}>New resource + a success story this week</Text>
+            </View>
           </View>
-          <View style={styles.promoText}>
-            <Text style={styles.promoTitle}>From {family.therapistName}</Text>
-            <Text style={styles.promoSub}>
-              2 new resources and a success story for {family.childName}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.purple} />
+          <ChevronRight size={18} color={colors.inkSoft} />
         </Pressable>
 
-        {/* Featured */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Featured resources</Text>
+        {/* Picked for Miller's age */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Picked for {family.childName}'s age</Text>
           <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Library' })}>
-            <Text style={styles.sectionLink}>See all</Text>
+            <Text style={styles.seeAll}>See all</Text>
           </Pressable>
         </View>
-        <FlatList
-          horizontal
-          data={featuredResources}
-          keyExtractor={(item) => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.featuredRail}
-          renderItem={({ item }) => (
+        <View style={styles.cardList}>
+          {featured.map((r) => (
             <ResourceCard
-              resource={item}
-              variant="featured"
-              onPress={() => navigation.navigate('ResourceDetail', { id: item.id })}
+              key={r.id}
+              resource={r}
+              onPress={() => navigation.navigate('ResourceDetail', { id: r.id })}
             />
-          )}
-        />
-
-        {/* Browse by category */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Browse by category</Text>
+          ))}
         </View>
-        <View style={styles.categoryGrid}>
-          {categoryList.map((name) => {
-            const meta = categories[name];
+
+        {/* Browse by focus area */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Browse by focus area</Text>
+        </View>
+        <View style={styles.focusGrid}>
+          {Object.entries(CATEGORY_META).map(([name, meta]) => {
+            const Icon = meta.icon;
             return (
               <Pressable
                 key={name}
                 onPress={() =>
                   navigation.navigate('Tabs', { screen: 'Library', params: { category: name } })
                 }
-                style={({ pressed }) => [
-                  styles.categoryTile,
-                  { backgroundColor: meta.tint },
-                  pressed && styles.pressed,
-                ]}
+                style={({ pressed }) => [styles.focusTile, pressed && styles.pressed]}
               >
-                <Ionicons name={meta.icon} size={26} color={meta.color} />
-                <Text style={[styles.categoryLabel, { color: meta.color }]}>{name}</Text>
+                <Icon size={20} color={meta.color} />
+                <Text style={styles.focusLabel}>{name}</Text>
               </Pressable>
             );
           })}
@@ -106,91 +101,104 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
-  scroll: { paddingBottom: 32 },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  scroll: { paddingBottom: 24 },
+  pressed: { opacity: 0.85 },
 
-  header: {
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  brandText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: colors.clay,
+  },
+
+  greetingBlock: { paddingHorizontal: 20, paddingBottom: 16, gap: 2 },
+  greeting: { fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft },
+  headline: { fontFamily: fonts.heading, fontSize: 24, color: colors.ink },
+
+  kicker: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: colors.ink,
+  },
+  cardSub: { marginTop: 2, fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft },
+
+  kidCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  headerText: { flex: 1, gap: 2 },
-  greeting: { fontFamily: fonts.heading, fontSize: 28, color: colors.purple },
-  subGreeting: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
-
-  kidMode: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 16,
     padding: 16,
-    borderRadius: 20,
-    backgroundColor: colors.purple,
-  },
-  kidModeIcon: {
-    width: 48,
-    height: 48,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: colors.sageLight,
   },
-  kidModeText: { flex: 1, gap: 1 },
-  kidModeTitle: { fontFamily: fonts.kid, fontSize: 20, color: colors.paper },
-  kidModeSub: { fontFamily: fonts.body, fontSize: 13, color: colors.mauveTint },
-
-  promo: {
+  kidCardText: { flex: 1 },
+  kidButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    backgroundColor: colors.ink,
+  },
+  kidButtonText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.white },
+
+  promoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     marginHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 16,
     padding: 16,
-    borderRadius: 20,
-    backgroundColor: colors.yellowTint,
-    borderWidth: 1,
-    borderColor: colors.yellow,
+    borderRadius: 16,
+    backgroundColor: colors.roseLight,
   },
+  promoLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   promoIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.yellow,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  promoText: { flex: 1, gap: 1 },
-  promoTitle: { fontFamily: fonts.headingMedium, fontSize: 17, color: colors.purple },
-  promoSub: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
 
-  sectionHeader: {
+  sectionRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  sectionTitle: { fontFamily: fonts.headingMedium, fontSize: 20, color: colors.purple },
-  sectionLink: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.mauve },
+  sectionTitle: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.ink },
+  seeAll: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.clay },
 
-  featuredRail: { paddingHorizontal: 20, gap: 12, paddingBottom: 24 },
+  cardList: { paddingHorizontal: 20, gap: 10, marginBottom: 20 },
 
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 20,
-    gap: 12,
+  focusGrid: { flexDirection: 'row', paddingHorizontal: 20, gap: 8 },
+  focusTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
-  categoryTile: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    borderRadius: 20,
-    padding: 16,
-    gap: 8,
-  },
-  categoryLabel: { fontFamily: fonts.bodySemiBold, fontSize: 14 },
+  focusLabel: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink },
 });

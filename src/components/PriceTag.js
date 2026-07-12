@@ -1,26 +1,27 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, fonts } from '../theme/colors';
-import { formatPrice } from '../data/mockData';
+import { AUD } from '../data/mockData';
 
-export default function PriceTag({ priceAud, size = 'small' }) {
-  const big = size === 'large';
+// Dashed-border price chip (prototype PriceTag).
+export default function PriceTag({ price }) {
   return (
-    <View style={[styles.tag, big && styles.tagLarge]}>
-      <Text style={[styles.text, big && styles.textLarge]}>{formatPrice(priceAud)}</Text>
+    <View style={styles.tag}>
+      <Text style={styles.text}>{AUD(price)}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   tag: {
-    backgroundColor: colors.yellow,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
     alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.clay + '88',
+    backgroundColor: colors.clayLight,
   },
-  tagLarge: { paddingHorizontal: 16, paddingVertical: 8 },
-  text: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.purple },
-  textLarge: { fontSize: 18 },
+  text: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.clay },
 });

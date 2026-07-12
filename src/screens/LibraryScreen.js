@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Search } from 'lucide-react-native';
 import { colors, fonts, categoryList } from '../theme/colors';
-import { resources } from '../data/mockData';
+import { RESOURCES } from '../data/mockData';
 import ScreenHeader from '../components/ScreenHeader';
 import ResourceCard from '../components/ResourceCard';
 
@@ -12,27 +12,23 @@ const FILTERS = ['All', ...categoryList];
 export default function LibraryScreen({ navigation, route }) {
   const [filter, setFilter] = useState('All');
 
-  // Home's category tiles deep-link here with a preselected category.
+  // Home's focus-area tiles deep-link here with a preselected category.
   useEffect(() => {
     if (route.params?.category) {
       setFilter(route.params.category);
     }
   }, [route.params?.category]);
 
-  const filtered = filter === 'All' ? resources : resources.filter((r) => r.category === filter);
+  const list = filter === 'All' ? RESOURCES : RESOURCES.filter((r) => r.category === filter);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScreenHeader title="Library" subtitle="Every resource in the catalogue" />
+      <ScreenHeader title="Resource Library" />
 
       {/* Search (static for now — wired up with Supabase later) */}
       <View style={styles.searchBox}>
-        <Ionicons name="search" size={18} color={colors.mauve} />
-        <TextInput
-          placeholder="Search resources…"
-          placeholderTextColor={colors.textMuted}
-          style={styles.searchInput}
-        />
+        <Search size={16} color={colors.inkSoft} />
+        <Text style={styles.searchText}>Search resources</Text>
       </View>
 
       {/* Category filter chips */}
@@ -58,7 +54,7 @@ export default function LibraryScreen({ navigation, route }) {
       </View>
 
       <FlatList
-        data={filtered}
+        data={list}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -83,38 +79,31 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 20,
     marginBottom: 12,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  searchInput: {
-    flex: 1,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    color: colors.purple,
-  },
-
-  chipRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 12 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
+    borderRadius: 12,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.line,
   },
-  chipActive: { backgroundColor: colors.purple, borderColor: colors.purple },
-  chipText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.purple },
-  chipTextActive: { color: colors.paper },
+  searchText: { fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft },
 
-  list: { paddingHorizontal: 20, paddingBottom: 32, gap: 12 },
+  chipRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 16 },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.sageLight,
+  },
+  chipActive: { backgroundColor: colors.ink },
+  chipText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.ink },
+  chipTextActive: { color: colors.white },
+
+  list: { paddingHorizontal: 20, paddingBottom: 24, gap: 10 },
   empty: {
     fontFamily: fonts.body,
     fontSize: 14,
-    color: colors.textMuted,
+    color: colors.inkSoft,
     textAlign: 'center',
     marginTop: 40,
   },

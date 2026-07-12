@@ -1,14 +1,16 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { categories, colors, fonts } from '../theme/colors';
-import { resources } from '../data/mockData';
+import { Check, Download, Leaf } from 'lucide-react-native';
+import { CATEGORY_META, colors, fonts } from '../theme/colors';
+import { AUD, RESOURCES } from '../data/mockData';
+import { useCart } from '../state/CartContext';
 import CategoryBadge from '../components/CategoryBadge';
 import PriceTag from '../components/PriceTag';
 
 export default function ResourceDetailScreen({ route }) {
-  const resource = resources.find((r) => r.id === route.params?.id);
+  const resource = RESOURCES.find((r) => r.id === route.params?.id);
+  const { inCart, addToCart, isOwned } = useCart();
 
   if (!resource) {
     return (
@@ -18,138 +20,116 @@ export default function ResourceDetailScreen({ route }) {
     );
   }
 
-  const meta = categories[resource.category] ?? { icon: 'pricetag', color: colors.mauve, tint: colors.mauveTint };
+  const meta = CATEGORY_META[resource.category];
+  const added = inCart(resource.id);
+  const owned = isOwned(resource.id);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Preview */}
-        <View style={[styles.preview, { backgroundColor: meta.tint }]}>
-          <Ionicons name={meta.icon} size={64} color={meta.color} />
-          {resource.tag ? (
-            <View style={styles.tagPill}>
-              <Text style={styles.tagText}>{resource.tag}</Text>
-            </View>
-          ) : null}
+        <View style={[styles.preview, { backgroundColor: meta.color + '1A' }]}>
+          <Leaf size={56} color={meta.color} />
         </View>
 
-        <View style={styles.body}>
-          <Text style={styles.title}>{resource.title}</Text>
-          <View style={styles.badgeRow}>
-            <CategoryBadge category={resource.category} size="large" />
-            <View style={styles.agePill}>
-              <Ionicons name="person" size={13} color={colors.mauve} />
-              <Text style={styles.ageText}>Ages {resource.ageRange}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.sectionLabel}>About this resource</Text>
-          <Text style={styles.description}>{resource.description}</Text>
-
-          <Text style={styles.sectionLabel}>What you get</Text>
-          <View style={styles.bullet}>
-            <Ionicons name="document" size={15} color={colors.mauve} />
-            <Text style={styles.bulletText}>Instant digital download (PDF)</Text>
-          </View>
-          <View style={styles.bullet}>
-            <Ionicons name="infinite" size={15} color={colors.mauve} />
-            <Text style={styles.bulletText}>Yours forever — re-download any time</Text>
-          </View>
+        <View style={styles.metaRow}>
+          <CategoryBadge category={resource.category} size={24} />
+          <Text style={styles.metaText}>
+            {resource.category} · {resource.age}
+          </Text>
         </View>
+
+        <Text style={styles.title}>{resource.title}</Text>
+        <Text style={styles.blurb}>{resource.blurb}</Text>
+
+        <View style={styles.priceRow}>
+          <PriceTag price={resource.price} />
+          {owned && (
+            <View style={styles.ownedRow}>
+              <Check size={14} color={colors.sage} />
+              <Text style={styles.ownedText}>Purchased</Text>
+            </View>
+          )}
+        </View>
+
+        {!owned ? (
+          <Pressable
+            onPress={() => addToCart(resource)}
+            disabled={added}
+            style={({ pressed }) => [
+              styles.cta,
+              { backgroundColor: added ? colors.sage : colors.clay },
+              pressed && styles.pressed,
+            ]}
+          >
+            {added ? (
+              <>
+                <Check size={16} color={colors.white} />
+                <Text style={styles.ctaText}>Added to cart</Text>
+              </>
+            ) : (
+              <Text style={styles.ctaText}>Add to cart · {AUD(resource.price)}</Text>
+            )}
+          </Pressable>
+        ) : (
+          <Pressable style={({ pressed }) => [styles.cta, styles.ctaOwned, pressed && styles.pressed]}>
+            <Download size={16} color={colors.white} />
+            <Text style={styles.ctaText}>Open resource</Text>
+          </Pressable>
+        )}
       </ScrollView>
-
-      {/* Purchase bar — disabled placeholder until Stripe is wired up */}
-      <View style={styles.footer}>
-        <PriceTag priceAud={resource.priceAud} size="large" />
-        <Pressable disabled style={styles.buyButton}>
-          <Ionicons name="cart" size={18} color={colors.purple} />
-          <Text style={styles.buyText}>Add to cart</Text>
-        </Pressable>
-      </View>
-      <Text style={styles.footerNote}>Purchasing arrives with the Stripe build pass</Text>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
-  scroll: { paddingBottom: 16 },
+  scroll: { padding: 20, paddingBottom: 32 },
   missing: {
     fontFamily: fonts.body,
-    color: colors.textMuted,
+    color: colors.inkSoft,
     textAlign: 'center',
     marginTop: 40,
   },
 
   preview: {
-    height: 200,
+    height: 160,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
   },
-  tagPill: {
-    position: 'absolute',
-    top: 14,
-    right: 14,
-    backgroundColor: colors.purple,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: { fontFamily: fonts.bodySemiBold, fontSize: 11, color: colors.paper },
 
-  body: { padding: 20, gap: 12 },
-  title: { fontFamily: fonts.heading, fontSize: 26, color: colors.purple },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  agePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  ageText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.purple },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  metaText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.inkSoft },
 
-  sectionLabel: {
-    fontFamily: fonts.headingMedium,
-    fontSize: 17,
-    color: colors.purple,
-    marginTop: 8,
+  title: { fontFamily: fonts.heading, fontSize: 24, color: colors.ink, marginBottom: 8 },
+  blurb: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 22,
+    color: colors.inkSoft,
+    marginBottom: 16,
   },
-  description: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23, color: '#4A3D57' },
-  bullet: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bulletText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
 
-  footer: {
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.cardBorder,
+    marginBottom: 20,
   },
-  buyButton: {
+  ownedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  ownedText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.sage },
+
+  cta: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    backgroundColor: colors.yellow,
     borderRadius: 999,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    opacity: 0.55,
+    paddingVertical: 13,
   },
-  buyText: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.purple },
-  footerNote: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    color: colors.textMuted,
-    textAlign: 'right',
-    paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 4,
-  },
+  ctaOwned: { backgroundColor: colors.ink },
+  ctaText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.white },
+  pressed: { opacity: 0.9 },
 });

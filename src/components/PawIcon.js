@@ -1,88 +1,16 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import Svg, { Ellipse } from 'react-native-svg';
 import { colors } from '../theme/colors';
 
-// Brand paw print: solid rounded pad + 4 toes, drawn with plain Views so we
-// don't need an SVG dependency. Matches the prototype's PawIcon.
-export default function PawIcon({ size = 32, color = colors.purple }) {
-  const toe = size * 0.24;
-  const pad = { width: size * 0.62, height: size * 0.5 };
+// Brand paw print — same geometry as the prototype's PawIcon SVG.
+export default function PawIcon({ size = 20, color = colors.ink }) {
   return (
-    <View style={{ width: size, height: size }}>
-      <View
-        style={[
-          styles.abs,
-          {
-            width: toe,
-            height: toe * 1.2,
-            borderRadius: toe,
-            backgroundColor: color,
-            left: size * 0.06,
-            top: size * 0.18,
-            transform: [{ rotate: '-20deg' }],
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.abs,
-          {
-            width: toe,
-            height: toe * 1.25,
-            borderRadius: toe,
-            backgroundColor: color,
-            left: size * 0.28,
-            top: size * 0.02,
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.abs,
-          {
-            width: toe,
-            height: toe * 1.25,
-            borderRadius: toe,
-            backgroundColor: color,
-            right: size * 0.28,
-            top: size * 0.02,
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.abs,
-          {
-            width: toe,
-            height: toe * 1.2,
-            borderRadius: toe,
-            backgroundColor: color,
-            right: size * 0.06,
-            top: size * 0.18,
-            transform: [{ rotate: '20deg' }],
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.abs,
-          {
-            width: pad.width,
-            height: pad.height,
-            backgroundColor: color,
-            left: (size - pad.width) / 2,
-            bottom: size * 0.04,
-            borderTopLeftRadius: pad.width * 0.5,
-            borderTopRightRadius: pad.width * 0.5,
-            borderBottomLeftRadius: pad.width * 0.42,
-            borderBottomRightRadius: pad.width * 0.42,
-          },
-        ]}
-      />
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Ellipse cx="12" cy="16" rx="5.6" ry="5.2" />
+      <Ellipse cx="4.8" cy="9.6" rx="2.1" ry="2.6" transform="rotate(-20 4.8 9.6)" />
+      <Ellipse cx="8.8" cy="5.6" rx="2.2" ry="2.9" transform="rotate(-8 8.8 5.6)" />
+      <Ellipse cx="15.2" cy="5.6" rx="2.2" ry="2.9" transform="rotate(8 15.2 5.6)" />
+      <Ellipse cx="19.2" cy="9.6" rx="2.1" ry="2.6" transform="rotate(20 19.2 9.6)" />
+    </Svg>
   );
 }
-
-const styles = StyleSheet.create({
-  abs: { position: 'absolute' },
-});

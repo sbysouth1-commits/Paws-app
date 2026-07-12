@@ -1,5 +1,5 @@
-// Mock catalogue mirroring the prototype. Replace with the Supabase
-// `resources` table once the UI is signed off (spec §4, §7.4).
+// Mock data mirroring the prototype (app_prototype3.jsx). Replace with the
+// Supabase tables once the UI is signed off (spec §4, §7.4).
 
 export const family = {
   parentName: 'Sarah',
@@ -7,114 +7,127 @@ export const family = {
   therapistName: 'Priya',
 };
 
-export const resources = [
+export const RESOURCES = [
   {
     id: 'r1',
-    title: 'Big Feelings Flip Cards',
-    category: 'Emotions',
-    ageRange: '3–7',
-    priceAud: 12,
-    tag: 'Popular',
-    featured: true,
-    description:
-      'Thirty printable flip cards that help kids name what they feel and pick a calming strategy to match. Includes a parent guide with scripts for tricky moments.',
+    title: 'Big Feelings Toolkit',
+    category: 'Behaviour',
+    age: '4–8 yrs',
+    price: 12.5,
+    blurb:
+      'A printable set of emotion cards and a feelings thermometer to help kids name and manage big feelings.',
+    tag: 'Bestseller',
   },
   {
     id: 'r2',
-    title: 'First Words Picture Board',
-    category: 'Communication',
-    ageRange: '2–5',
-    priceAud: 9,
-    tag: 'New',
-    featured: true,
-    description:
-      'A printable communication board covering everyday requests — eat, drink, play, help, more, finished — designed for early talkers and AAC beginners.',
+    title: 'Speech Sound Safari',
+    category: 'Speech',
+    age: '3–6 yrs',
+    price: 9.0,
+    blurb:
+      'Articulation practice cards themed around Australian animals, built for early sound development.',
+    tag: null,
   },
   {
     id: 'r3',
-    title: 'Calm Corner Starter Kit',
+    title: 'Sensory Break Cards',
     category: 'Sensory',
-    ageRange: '3–8',
-    priceAud: 15,
-    tag: 'Therapist pick',
-    featured: true,
-    description:
-      'Everything you need to set up a calm-down space at home: visual steps, breathing cards, and a checklist of low-cost sensory tools that actually get used.',
+    age: '5–10 yrs',
+    price: 8.0,
+    blurb:
+      'Quick, illustrated sensory reset activities kids can pick from when they need a break.',
+    tag: null,
   },
   {
     id: 'r4',
-    title: 'Turn-Taking Game Pack',
-    category: 'Social Skills',
-    ageRange: '4–8',
-    priceAud: 10,
-    featured: false,
-    description:
-      'Five print-and-play games built around waiting, turn-taking and losing gracefully — with grown-up prompts for coaching in the moment.',
+    title: 'Calm Corner Visual Schedule',
+    category: 'Behaviour',
+    age: '4–9 yrs',
+    price: 7.5,
+    blurb:
+      'A step-by-step visual routine for a calm-down space at home or in the classroom.',
+    tag: 'New',
   },
   {
     id: 'r5',
-    title: 'Morning Routine Visual Schedule',
-    category: 'Routines',
-    ageRange: '3–9',
-    priceAud: 8,
-    tag: 'Popular',
-    featured: true,
-    description:
-      'A velcro-ready visual schedule for smoother mornings: wake up, toilet, dressed, breakfast, teeth, shoes, bag. Includes blank tiles to make your own steps.',
+    title: 'Fine Motor Fun Pack',
+    category: 'OT',
+    age: '3–7 yrs',
+    price: 11.0,
+    blurb:
+      'Cutting, tracing and lacing activities that build fine motor strength through play.',
+    tag: null,
   },
   {
     id: 'r6',
-    title: 'Scissor Skills Practice Book',
-    category: 'Motor Skills',
-    ageRange: '3–6',
-    priceAud: 7,
-    featured: false,
-    description:
-      'Twenty pages of graded cutting practice, from single snips to curves and shapes, sequenced the way an OT would introduce them.',
-  },
-  {
-    id: 'r7',
-    title: 'Worry Monster Story + Activities',
-    category: 'Emotions',
-    ageRange: '5–9',
-    priceAud: 14,
-    tag: 'New',
-    featured: false,
-    description:
-      'An illustrated social story about a monster who eats worries, paired with six activities for externalising anxiety and building brave talk.',
-  },
-  {
-    id: 'r8',
-    title: 'Playdate Conversation Cues',
-    category: 'Social Skills',
-    ageRange: '5–10',
-    priceAud: 9,
-    featured: false,
-    description:
-      'Pocket-sized cue cards for starting, keeping and ending conversations — great for rehearsing before playdates or school.',
-  },
-  {
-    id: 'r9',
-    title: 'Heavy Work Movement Deck',
-    category: 'Sensory',
-    ageRange: '4–10',
-    priceAud: 11,
-    featured: false,
-    description:
-      'Forty proprioceptive "heavy work" activity cards for regulation breaks at home or school. No equipment needed for most.',
-  },
-  {
-    id: 'r10',
-    title: 'Bedtime Wind-Down Routine Cards',
-    category: 'Routines',
-    ageRange: '2–8',
-    priceAud: 8,
-    featured: false,
-    description:
-      'A calm, predictable bedtime sequence in ten illustrated cards, with tips for fading grown-up support over time.',
+    title: 'Listening Ears Game Set',
+    category: 'Speech',
+    age: '4–8 yrs',
+    price: 10.0,
+    blurb:
+      'Auditory processing games to strengthen listening and following-directions skills.',
+    tag: null,
   },
 ];
 
-export const featuredResources = resources.filter((r) => r.featured);
+// Resources dropped specifically for Miller by his therapist (not for sale — already shared)
+export const THERAPIST_RESOURCES = [
+  {
+    id: 't1',
+    title: "Miller's Morning Routine Cards",
+    category: 'Behaviour',
+    date: '3 July 2026',
+    note:
+      'Made these after our session last week — a visual routine for getting ready without the meltdowns. Try it for a few mornings and let me know how it goes.',
+    from: 'Priya (OT)',
+  },
+  {
+    id: 't2',
+    title: "'S' Sound Practice List",
+    category: 'Speech',
+    date: '28 June 2026',
+    note:
+      "A few extra words to practise the 's' sound at home this week, building on what we covered in the swimming lesson chat.",
+    from: 'Priya (OT)',
+  },
+  {
+    id: 't3',
+    title: 'Sensory Kit for the Car',
+    category: 'Sensory',
+    date: '14 June 2026',
+    note:
+      'Some ideas for keeping the car ride calm before school drop-off, based on what we noticed on Tuesday.',
+    from: 'Priya (OT)',
+  },
+];
 
-export const formatPrice = (priceAud) => `A$${priceAud}`;
+export const SUCCESS_STORIES = [
+  {
+    id: 's1',
+    title: 'First full day at school!',
+    date: '8 July 2026',
+    story:
+      'Miller made it through his first full day without needing a pickup call. He used his feelings cards twice during the day and told his teacher when he needed a break. Such a big step — so proud of him.',
+    from: 'Priya (OT)',
+  },
+  {
+    id: 's2',
+    title: 'In the pool without tears',
+    date: '22 June 2026',
+    story:
+      'Swimming lessons have been tough, but this week Miller got in the water on his own and stayed for the full 20 minutes. We used the sensory prep routine beforehand and it made a real difference.',
+    from: 'Priya (OT)',
+  },
+  {
+    id: 's3',
+    title: 'Asked a friend to play',
+    date: '5 June 2026',
+    story:
+      "Miller initiated play with another child at the park for the first time, using the 'can I join in' phrase we practised. Small moment, huge milestone.",
+    from: 'Priya (OT)',
+  },
+];
+
+export function AUD(n) {
+  return `$${n.toFixed(2)} AUD`;
+}

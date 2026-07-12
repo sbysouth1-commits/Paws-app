@@ -1,47 +1,21 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { categories, colors, fonts } from '../theme/colors';
-import CategoryBadge from './CategoryBadge';
+import { Leaf } from 'lucide-react-native';
+import { CATEGORY_META, colors, fonts } from '../theme/colors';
 import PriceTag from './PriceTag';
 
-// variant: 'featured' (wide card for horizontal rails) | 'list' (full-width row)
-export default function ResourceCard({ resource, onPress, variant = 'list' }) {
-  const meta = categories[resource.category] ?? { icon: 'pricetag', color: colors.mauve, tint: colors.mauveTint };
-
-  if (variant === 'featured') {
-    return (
-      <Pressable onPress={onPress} style={({ pressed }) => [styles.featuredCard, pressed && styles.pressed]}>
-        <View style={[styles.featuredPreview, { backgroundColor: meta.tint }]}>
-          <Ionicons name={meta.icon} size={40} color={meta.color} />
-          {resource.tag ? (
-            <View style={[styles.tagPill, styles.tagPillFloating]}>
-              <Text style={styles.tagText}>{resource.tag}</Text>
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.featuredBody}>
-          <Text style={styles.title} numberOfLines={2}>
-            {resource.title}
-          </Text>
-          <Text style={styles.ageRange}>Ages {resource.ageRange}</Text>
-          <View style={styles.rowBetween}>
-            <CategoryBadge category={resource.category} />
-            <PriceTag priceAud={resource.priceAud} />
-          </View>
-        </View>
-      </Pressable>
-    );
-  }
-
+// Row-style catalogue card (prototype ResourceCard): tinted leaf tile,
+// title + optional tag pill, "Category · age", dashed price chip.
+export default function ResourceCard({ resource, onPress }) {
+  const meta = CATEGORY_META[resource.category];
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.listCard, pressed && styles.pressed]}>
-      <View style={[styles.listPreview, { backgroundColor: meta.tint }]}>
-        <Ionicons name={meta.icon} size={28} color={meta.color} />
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      <View style={[styles.tile, { backgroundColor: meta.color + '1A' }]}>
+        <Leaf size={26} color={meta.color} />
       </View>
-      <View style={styles.listBody}>
-        <View style={styles.rowBetween}>
-          <Text style={[styles.title, styles.listTitle]} numberOfLines={2}>
+      <View style={styles.body}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>
             {resource.title}
           </Text>
           {resource.tag ? (
@@ -50,10 +24,11 @@ export default function ResourceCard({ resource, onPress, variant = 'list' }) {
             </View>
           ) : null}
         </View>
-        <Text style={styles.ageRange}>Ages {resource.ageRange}</Text>
-        <View style={styles.rowBetween}>
-          <CategoryBadge category={resource.category} />
-          <PriceTag priceAud={resource.priceAud} />
+        <Text style={styles.meta}>
+          {resource.category} · {resource.age}
+        </Text>
+        <View style={styles.priceRow}>
+          <PriceTag price={resource.price} />
         </View>
       </View>
     </Pressable>
@@ -61,52 +36,46 @@ export default function ResourceCard({ resource, onPress, variant = 'list' }) {
 }
 
 const styles = StyleSheet.create({
-  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
-  rowBetween: {
+  card: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
-  title: { fontFamily: fonts.headingMedium, fontSize: 16, color: colors.purple },
-  ageRange: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  pressed: { opacity: 0.85 },
+  tile: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { flex: 1, minWidth: 0 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  title: {
+    flexShrink: 1,
+    fontFamily: fonts.heading,
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.ink,
+  },
   tagPill: {
-    backgroundColor: colors.purple,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: colors.sageLight,
   },
-  tagPillFloating: { position: 'absolute', top: 10, right: 10 },
-  tagText: { fontFamily: fonts.bodySemiBold, fontSize: 10, color: colors.paper },
-
-  featuredCard: {
-    width: 220,
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    overflow: 'hidden',
+  tagText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: colors.ink,
   },
-  featuredPreview: {
-    height: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featuredBody: { padding: 12, gap: 6 },
-
-  listCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    overflow: 'hidden',
-  },
-  listPreview: {
-    width: 84,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listBody: { flex: 1, padding: 12, gap: 6 },
-  listTitle: { flex: 1 },
+  meta: { marginTop: 2, fontFamily: fonts.body, fontSize: 12, color: colors.inkSoft },
+  priceRow: { marginTop: 6 },
 });

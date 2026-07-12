@@ -11,25 +11,29 @@ Scan the QR code with Expo Go (iOS/Android) or press `i` / `a` for a simulator.
 
 ## What's built
 
-- **Home** — greeting, Kid Mode shortcut, "From Priya" promo, featured resources, browse-by-category grid
-- **Library** — full catalogue, category filter chips, search bar (static for now)
-- **Resource Detail** — tap any card to preview it (Add to cart is a disabled placeholder)
-- Bottom tabs for **For Miller**, **Cart**, **Profile** are placeholder screens, ready for the next build pass
+Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, paw SVG).
+
+- **Home** — brand row, greeting, Kid Mode card, "From Priya" promo, "Picked for Miller's age" list, browse-by-focus-area tiles
+- **Library** — full catalogue, category filter chips (Speech / OT / Sensory / Behaviour), static search bar
+- **Resource Detail** — preview, blurb, dashed AUD price tag, working Add-to-cart (mock state), "Open resource" when owned
+- **Cart** — line items, remove, total, mock "Pay with card" checkout that unlocks purchases
+- Bottom tabs for **For Miller** and **Profile** are placeholder screens (their mock data is already in `mockData.js`); Kid Mode is a placeholder too
 
 ## Structure
 
 ```
 App.js                        entry point, loads Fraunces/Public Sans/Baloo 2
-src/theme/colors.js            brand colors + category icon/color map
-src/data/mockData.js           resource catalogue (mirrors the prototype)
+src/theme/colors.js            prototype design tokens + CATEGORY_META
+src/data/mockData.js           catalogue, therapist drops, success stories (from the prototype)
+src/state/CartContext.js       mock cart + purchases state
 src/components/                PawIcon, ResourceCard, CategoryBadge, PriceTag, ScreenHeader
-src/screens/                   HomeScreen, LibraryScreen, ResourceDetailScreen, PlaceholderScreen
-src/navigation/RootNavigator.js  bottom tabs + stack for the detail screen
+src/screens/                   Home, Library, ResourceDetail, Cart, Placeholder
+src/navigation/RootNavigator.js  bottom tabs + stack for detail/Kid Mode
 ```
 
 ## Next steps (per the spec)
 
-1. Build out **For Miller** (therapist resources + success stories tabs), **Cart**, **Profile**, and **Kid Mode** the same way Home/Library were built.
+1. Build out **For Miller** (therapist resources + success stories tabs), **Profile**, and **Kid Mode** from the prototype — their data and designs are ready.
 2. Wire up Supabase: auth, `resources` table, `purchases`, `therapist_resources`, `success_stories` (with row-level security scoped to the owning family).
 3. Add Stripe checkout last, once the rest of the app works against real/mock data.
 

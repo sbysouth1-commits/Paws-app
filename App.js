@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/public-sans';
 import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
 import RootNavigator from './src/navigation/RootNavigator';
+import { CartProvider } from './src/state/CartContext';
 import { colors } from './src/theme/colors';
 
 export default function App() {
@@ -27,16 +28,16 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={colors.purple} />
+        <ActivityIndicator color={colors.ink} />
       </View>
     );
   }
 
   return (
-    <>
+    <CartProvider>
       <StatusBar style="dark" backgroundColor={colors.paper} />
       <RootNavigator />
-    </>
+    </CartProvider>
   );
 }
 
