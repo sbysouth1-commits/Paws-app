@@ -11,6 +11,7 @@ import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import ResourceDetailScreen from '../screens/ResourceDetailScreen';
 import CartScreen from '../screens/CartScreen';
+import ForChildScreen from '../screens/ForChildScreen';
 import PlaceholderScreen from '../screens/PlaceholderScreen';
 
 const Stack = createNativeStackNavigator();
@@ -49,18 +50,12 @@ function Tabs() {
       />
       <Tab.Screen
         name="ForChild"
+        component={ForChildScreen}
         options={{
           title: `For ${family.childName}`,
           tabBarIcon: ({ color }) => <PawIcon size={20} color={color} />,
         }}
-      >
-        {() => (
-          <PlaceholderScreen
-            title={`For ${family.childName}`}
-            message={`Resources ${family.therapistName} has shared and ${family.childName}'s success stories will live here — coming in the next build pass.`}
-          />
-        )}
-      </Tab.Screen>
+      />
       <Tab.Screen
         name="Cart"
         component={CartScreen}
