@@ -33,6 +33,7 @@ src/navigation/RootNavigator.js  bottom tabs + stack for the detail screen
 2. Wire up Supabase: auth, `resources` table, `purchases`, `therapist_resources`, `success_stories` (with row-level security scoped to the owning family).
 3. Add Stripe checkout last, once the rest of the app works against real/mock data.
 
-## Note on this environment
+## Notes
 
-This project was scaffolded without network access, so `npm install` hasn't been run here — do that on your machine first. Dependency versions in `package.json` target Expo SDK 51; if you're on a newer Expo CLI it may prompt you to upgrade a package or two, which is safe to accept.
+- Dependency versions target **Expo SDK 57** (the current Expo Go release). If a newer SDK is out when you pull this down, `npx expo install --fix` will bump the pinned packages.
+- The mock catalogue lives in `src/data/mockData.js` — edit titles/prices/categories there until Supabase is wired up.
