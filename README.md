@@ -39,5 +39,5 @@ src/navigation/RootNavigator.js  bottom tabs + stack for detail/Kid Mode
 
 ## Notes
 
-- Dependency versions target **Expo SDK 56** (the version the Play Store / App Store build of Expo Go currently supports). If a newer SDK is out when you pull this down, `npx expo install --fix` will bump the pinned packages.
+- Dependency versions target **Expo SDK 54** — the version the Play Store/App Store build of Expo Go supports as of July 2026 (Expo skipped store releases for 55/56; a 57 build is in review). If a newer SDK is out when you pull this down, `npx expo install --fix` will bump the pinned packages.
 - The mock catalogue lives in `src/data/mockData.js` — edit titles/prices/categories there until Supabase is wired up.
