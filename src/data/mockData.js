@@ -4,6 +4,7 @@
 export const family = {
   parentName: 'Sarah',
   childName: 'Miller',
+  childAge: 6,
   therapistName: 'Priya',
 };
 

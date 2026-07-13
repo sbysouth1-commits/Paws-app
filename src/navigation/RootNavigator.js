@@ -12,6 +12,7 @@ import LibraryScreen from '../screens/LibraryScreen';
 import ResourceDetailScreen from '../screens/ResourceDetailScreen';
 import CartScreen from '../screens/CartScreen';
 import ForChildScreen from '../screens/ForChildScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import PlaceholderScreen from '../screens/PlaceholderScreen';
 
 const Stack = createNativeStackNavigator();
@@ -74,19 +75,13 @@ function Tabs() {
       />
       <Tab.Screen
         name="Profile"
+        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <User size={20} color={color} strokeWidth={focused ? 2.4 : 1.8} />
           ),
         }}
-      >
-        {() => (
-          <PlaceholderScreen
-            title="Profile"
-            message={`Parent account, ${family.childName}'s profile, purchase history, settings and a link to pawsitivekids.com.au — coming soon.`}
-          />
-        )}
-      </Tab.Screen>
+      />
     </Tab.Navigator>
   );
 }
