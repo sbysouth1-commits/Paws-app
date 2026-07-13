@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
 import { colors, fonts, categoryList } from '../theme/colors';
-import { RESOURCES } from '../data/mockData';
+import { useResources } from '../state/ResourcesContext';
 import ScreenHeader from '../components/ScreenHeader';
 import ResourceCard from '../components/ResourceCard';
 
@@ -11,6 +11,7 @@ const FILTERS = ['All', ...categoryList];
 
 export default function LibraryScreen({ navigation, route }) {
   const [filter, setFilter] = useState('All');
+  const { resources, loading, error, reload } = useResources();
 
   // Home's focus-area tiles deep-link here with a preselected category.
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function LibraryScreen({ navigation, route }) {
     }
   }, [route.params?.category]);
 
-  const list = filter === 'All' ? RESOURCES : RESOURCES.filter((r) => r.category === filter);
+  const list = filter === 'All' ? resources : resources.filter((r) => r.category === filter);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -64,7 +65,20 @@ export default function LibraryScreen({ navigation, route }) {
             onPress={() => navigation.navigate('ResourceDetail', { id: item.id })}
           />
         )}
-        ListEmptyComponent={<Text style={styles.empty}>Nothing here yet.</Text>}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator color={colors.ink} style={styles.loader} />
+          ) : error ? (
+            <View style={styles.stateBox}>
+              <Text style={styles.empty}>Couldn't load resources.</Text>
+              <Pressable onPress={reload} style={styles.retry}>
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={styles.empty}>Nothing in this category yet.</Text>
+          )
+        }
       />
     </SafeAreaView>
   );
@@ -100,6 +114,8 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.white },
 
   list: { paddingHorizontal: 20, paddingBottom: 24, gap: 10 },
+  loader: { marginTop: 40 },
+  stateBox: { alignItems: 'center', marginTop: 40, gap: 12 },
   empty: {
     fontFamily: fonts.body,
     fontSize: 14,
@@ -107,4 +123,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 40,
   },
+  retry: {
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    backgroundColor: colors.ink,
+  },
+  retryText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.white },
 });

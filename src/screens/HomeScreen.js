@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Sparkles } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
-import { RESOURCES, family } from '../data/mockData';
+import { family } from '../data/mockData';
+import { useResources } from '../state/ResourcesContext';
 import PawIcon from '../components/PawIcon';
 import ResourceCard from '../components/ResourceCard';
 
 export default function HomeScreen({ navigation }) {
-  const featured = RESOURCES.slice(0, 3);
+  const { resources, loading } = useResources();
+  const featured = resources.slice(0, 3);
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -64,13 +66,17 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         </View>
         <View style={styles.cardList}>
-          {featured.map((r) => (
-            <ResourceCard
-              key={r.id}
-              resource={r}
-              onPress={() => navigation.navigate('ResourceDetail', { id: r.id })}
-            />
-          ))}
+          {loading ? (
+            <ActivityIndicator color={colors.ink} style={styles.loader} />
+          ) : (
+            featured.map((r) => (
+              <ResourceCard
+                key={r.id}
+                resource={r}
+                onPress={() => navigation.navigate('ResourceDetail', { id: r.id })}
+              />
+            ))
+          )}
         </View>
 
         {/* Browse by focus area */}
@@ -188,6 +194,7 @@ const styles = StyleSheet.create({
   seeAll: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.clay },
 
   cardList: { paddingHorizontal: 20, gap: 10, marginBottom: 20 },
+  loader: { paddingVertical: 24 },
 
   focusGrid: { flexDirection: 'row', paddingHorizontal: 20, gap: 8 },
   focusTile: {

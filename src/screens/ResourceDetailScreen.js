@@ -3,13 +3,15 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, Download, Leaf } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
-import { AUD, RESOURCES } from '../data/mockData';
+import { AUD } from '../data/mockData';
 import { useCart } from '../state/CartContext';
+import { useResources } from '../state/ResourcesContext';
 import CategoryBadge from '../components/CategoryBadge';
 import PriceTag from '../components/PriceTag';
 
 export default function ResourceDetailScreen({ route }) {
-  const resource = RESOURCES.find((r) => r.id === route.params?.id);
+  const { getById } = useResources();
+  const resource = getById(route.params?.id);
   const { inCart, addToCart, isOwned } = useCart();
 
   if (!resource) {

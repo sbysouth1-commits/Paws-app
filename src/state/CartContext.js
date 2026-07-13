@@ -1,13 +1,18 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { RESOURCES } from '../data/mockData';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 // Mock cart + purchases, matching the prototype's app-shell state. Swap for
 // Supabase `purchases` + Stripe checkout in a later build pass.
 const CartContext = createContext(null);
 
+// In mock mode, seed one owned resource so Profile/Kid Mode have something to
+// show. With Supabase on, purchases start empty (they'll come from the DB next).
+const initialPurchases = isSupabaseConfigured ? [] : [RESOURCES[3]];
+
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
-  const [purchases, setPurchases] = useState([RESOURCES[3]]); // seed one owned resource
+  const [purchases, setPurchases] = useState(initialPurchases);
 
   const value = useMemo(() => {
     const isOwned = (id) => purchases.some((p) => p.id === id);

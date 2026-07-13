@@ -13,6 +13,7 @@ import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
 import RootNavigator from './src/navigation/RootNavigator';
 import AuthScreen from './src/screens/AuthScreen';
 import { CartProvider } from './src/state/CartContext';
+import { ResourcesProvider } from './src/state/ResourcesContext';
 import { AuthProvider, useAuth } from './src/state/AuthContext';
 import { colors } from './src/theme/colors';
 
@@ -33,9 +34,11 @@ function Gate() {
   if (supabaseEnabled && !session) return <AuthScreen />;
 
   return (
-    <CartProvider>
-      <RootNavigator />
-    </CartProvider>
+    <ResourcesProvider>
+      <CartProvider>
+        <RootNavigator />
+      </CartProvider>
+    </ResourcesProvider>
   );
 }
 
