@@ -13,7 +13,7 @@ import ResourceDetailScreen from '../screens/ResourceDetailScreen';
 import CartScreen from '../screens/CartScreen';
 import ForChildScreen from '../screens/ForChildScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import PlaceholderScreen from '../screens/PlaceholderScreen';
+import KidModeScreen from '../screens/KidModeScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -100,17 +100,9 @@ export default function RootNavigator() {
       >
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
         <Stack.Screen name="ResourceDetail" component={ResourceDetailScreen} options={{ title: '' }} />
-        {/* Keeps the back header until the real Kid Mode (with its lock-to-exit
-            button) is built, so there's always a way out. */}
-        <Stack.Screen name="KidMode" options={{ title: 'Kid Mode' }}>
-          {() => (
-            <PlaceholderScreen
-              kid
-              title={`Hey ${family.childName}! 🌿`}
-              message="Kid Mode's big-button view of unlocked activities is coming in the next build pass — no purchasing or external links here."
-            />
-          )}
-        </Stack.Screen>
+        {/* Kid Mode has its own in-screen lock button to exit, so no stack header. */}
+        <Stack.Screen name="KidMode" component={KidModeScreen} options={{ headerShown: false }} />
+        {/* gestureEnabled stays default; the lock button is the intended way out. */}
       </Stack.Navigator>
     </NavigationContainer>
   );
