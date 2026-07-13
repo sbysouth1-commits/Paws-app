@@ -3,8 +3,9 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, Trash2 } from 'lucide-react-native';
 import { colors, fonts } from '../theme/colors';
-import { AUD, family } from '../data/mockData';
+import { AUD } from '../data/mockData';
 import { useCart } from '../state/CartContext';
+import { useChild } from '../state/ChildContext';
 import ScreenHeader from '../components/ScreenHeader';
 import CategoryBadge from '../components/CategoryBadge';
 
@@ -12,6 +13,7 @@ import CategoryBadge from '../components/CategoryBadge';
 // real Stripe charge in a later build pass — for now it just saves the purchase.
 export default function CartScreen() {
   const { cart, removeFromCart, checkout } = useCart();
+  const { childName } = useChild();
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -54,7 +56,7 @@ export default function CartScreen() {
       <ScreenHeader title="Your Cart" />
       {cart.length === 0 ? (
         <Text style={styles.empty}>
-          Your cart is empty. Browse the library to find resources for {family.childName}.
+          Your cart is empty. Browse the library to find resources for {childName}.
         </Text>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

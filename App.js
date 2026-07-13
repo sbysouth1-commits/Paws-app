@@ -12,9 +12,11 @@ import {
 import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
 import RootNavigator from './src/navigation/RootNavigator';
 import AuthScreen from './src/screens/AuthScreen';
+import AddChildScreen from './src/screens/AddChildScreen';
 import { CartProvider } from './src/state/CartContext';
 import { ResourcesProvider } from './src/state/ResourcesContext';
 import { AuthProvider, useAuth } from './src/state/AuthContext';
+import { ChildProvider, useChild } from './src/state/ChildContext';
 import { colors } from './src/theme/colors';
 
 function Loading() {
@@ -22,6 +24,22 @@ function Loading() {
     <View style={styles.loading}>
       <ActivityIndicator color={colors.ink} />
     </View>
+  );
+}
+
+// Once logged in (or in mock mode), require a child profile before the app.
+function ChildGate() {
+  const { loading, needsOnboarding } = useChild();
+
+  if (loading) return <Loading />;
+  if (needsOnboarding) return <AddChildScreen />;
+
+  return (
+    <ResourcesProvider>
+      <CartProvider>
+        <RootNavigator />
+      </CartProvider>
+    </ResourcesProvider>
   );
 }
 
@@ -34,11 +52,9 @@ function Gate() {
   if (supabaseEnabled && !session) return <AuthScreen />;
 
   return (
-    <ResourcesProvider>
-      <CartProvider>
-        <RootNavigator />
-      </CartProvider>
-    </ResourcesProvider>
+    <ChildProvider>
+      <ChildGate />
+    </ChildProvider>
   );
 }
 

@@ -4,13 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Sparkles } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
 import { family } from '../data/mockData';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { useResources } from '../state/ResourcesContext';
+import { useChild } from '../state/ChildContext';
 import PawIcon from '../components/PawIcon';
 import ResourceCard from '../components/ResourceCard';
 
 export default function HomeScreen({ navigation }) {
   const { resources, loading } = useResources();
+  const { childName, therapistName } = useChild();
   const featured = resources.slice(0, 3);
+  // We don't collect the parent's name yet, so only personalise the greeting
+  // in mock mode; live mode greets without a name.
+  const greetingName = isSupabaseConfigured ? '' : family.parentName;
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -22,15 +28,15 @@ export default function HomeScreen({ navigation }) {
 
         {/* Greeting */}
         <View style={styles.greetingBlock}>
-          <Text style={styles.greeting}>G'day, {family.parentName} 👋</Text>
-          <Text style={styles.headline}>Resources for {family.childName}</Text>
+          <Text style={styles.greeting}>G'day{greetingName ? `, ${greetingName}` : ''} 👋</Text>
+          <Text style={styles.headline}>Resources for {childName}</Text>
         </View>
 
         {/* Kid Mode card */}
         <View style={styles.kidCard}>
           <View style={styles.kidCardText}>
             <Text style={styles.kicker}>Just for kids</Text>
-            <Text style={styles.cardSub}>Switch to {family.childName}'s simple view</Text>
+            <Text style={styles.cardSub}>Switch to {childName}'s simple view</Text>
           </View>
           <Pressable
             onPress={() => navigation.navigate('KidMode')}
@@ -51,7 +57,7 @@ export default function HomeScreen({ navigation }) {
               <PawIcon size={18} color={colors.rose} />
             </View>
             <View>
-              <Text style={styles.kicker}>From {family.therapistName}</Text>
+              <Text style={styles.kicker}>From {therapistName || 'your therapist'}</Text>
               <Text style={styles.cardSub}>New resource + a success story this week</Text>
             </View>
           </View>
@@ -60,7 +66,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* Picked for Miller's age */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Picked for {family.childName}'s age</Text>
+          <Text style={styles.sectionTitle}>Picked for {childName}'s age</Text>
           <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'Library' })}>
             <Text style={styles.seeAll}>See all</Text>
           </Pressable>

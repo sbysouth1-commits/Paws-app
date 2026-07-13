@@ -3,20 +3,21 @@ import { View, Text, ScrollView, Pressable, Modal, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Lock, Leaf, X } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
-import { family } from '../data/mockData';
 import { useCart } from '../state/CartContext';
+import { useChild } from '../state/ChildContext';
 
 // Kid Mode (prototype KidModeScreen): a simplified, big-button view of only
 // the child's unlocked resources. No purchasing, no external links. The lock
 // button hands control back to the grown-up.
 export default function KidModeScreen({ navigation }) {
   const { purchases } = useCart();
+  const { childName } = useChild();
   const [openResource, setOpenResource] = useState(null);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hey {family.childName}! 🌿</Text>
+        <Text style={styles.greeting}>Hey {childName}! 🌿</Text>
         <Pressable
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.lockButton, pressed && styles.pressed]}

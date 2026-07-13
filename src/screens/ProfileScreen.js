@@ -6,6 +6,7 @@ import { colors, fonts } from '../theme/colors';
 import { family } from '../data/mockData';
 import { useCart } from '../state/CartContext';
 import { useAuth } from '../state/AuthContext';
+import { useChild } from '../state/ChildContext';
 import ScreenHeader from '../components/ScreenHeader';
 import CategoryBadge from '../components/CategoryBadge';
 
@@ -15,7 +16,12 @@ const WEBSITE = 'https://pawsitivekids.com.au';
 export default function ProfileScreen({ navigation }) {
   const { purchases } = useCart();
   const { supabaseEnabled, user, signOut } = useAuth();
-  const avatarInitial = family.parentName.charAt(0).toUpperCase();
+  const { childName, childAge } = useChild();
+  // No parent name is collected yet, so fall back to the email's local part in
+  // live mode (and the mock name otherwise).
+  const parentName = supabaseEnabled ? user?.email?.split('@')[0] || 'Parent' : family.parentName;
+  const avatarInitial = parentName.charAt(0).toUpperCase();
+  const childSummary = childAge ? `${childName} (${childAge} yrs)` : childName;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -27,10 +33,8 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.avatarText}>{avatarInitial}</Text>
           </View>
           <View style={styles.accountText}>
-            <Text style={styles.accountName}>{family.parentName}</Text>
-            <Text style={styles.accountSub}>
-              1 child profile · {family.childName} ({family.childAge} yrs)
-            </Text>
+            <Text style={styles.accountName}>{parentName}</Text>
+            <Text style={styles.accountSub}>1 child profile · {childSummary}</Text>
             {supabaseEnabled && user?.email ? (
               <Text style={styles.accountEmail}>{user.email}</Text>
             ) : null}

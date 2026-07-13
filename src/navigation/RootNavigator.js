@@ -4,8 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Home, BookOpen, ShoppingBag, User } from 'lucide-react-native';
 import { colors, fonts } from '../theme/colors';
-import { family } from '../data/mockData';
 import { useCart } from '../state/CartContext';
+import { useChild } from '../state/ChildContext';
 import PawIcon from '../components/PawIcon';
 import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
@@ -20,6 +20,7 @@ const Tab = createBottomTabNavigator();
 
 function Tabs() {
   const { cart } = useCart();
+  const { childName } = useChild();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -53,7 +54,7 @@ function Tabs() {
         name="ForChild"
         component={ForChildScreen}
         options={{
-          title: `For ${family.childName}`,
+          title: `For ${childName}`,
           tabBarIcon: ({ color }) => <PawIcon size={20} color={color} />,
         }}
       />

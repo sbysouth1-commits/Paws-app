@@ -1,18 +1,33 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Award, CalendarDays, Download } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
 import { THERAPIST_RESOURCES, SUCCESS_STORIES, family } from '../data/mockData';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { useChild } from '../state/ChildContext';
 import ScreenHeader from '../components/ScreenHeader';
 import PawIcon from '../components/PawIcon';
 
 // "For [Child]" (prototype TherapistScreen): private resources the therapist
 // has dropped for this child, plus their success stories. Read-only for
-// families — content is added by the therapist (via Supabase later).
+// families — content is added by the therapist via the Supabase table editor.
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+// Format an ISO timestamp as "3 July 2026" without relying on Intl (Hermes).
+function formatDate(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
 
 function TherapistResourceCard({ resource }) {
-  const meta = CATEGORY_META[resource.category];
+  const meta = CATEGORY_META[resource.category] ?? CATEGORY_META.Behaviour;
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -58,17 +73,68 @@ function SuccessStoryCard({ story }) {
 }
 
 export default function ForChildScreen() {
+  const { child, childName } = useChild();
   const [tab, setTab] = useState('resources');
+  const [resources, setResources] = useState(isSupabaseConfigured ? [] : THERAPIST_RESOURCES);
+  const [stories, setStories] = useState(isSupabaseConfigured ? [] : SUCCESS_STORIES);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !child?.id) return;
+    let active = true;
+    setLoading(true);
+    Promise.all([
+      supabase
+        .from('therapist_resources')
+        .select('*')
+        .eq('child_id', child.id)
+        .order('shared_at', { ascending: false }),
+      supabase
+        .from('success_stories')
+        .select('*')
+        .eq('child_id', child.id)
+        .order('occurred_at', { ascending: false }),
+    ]).then(([res, sto]) => {
+      if (!active) return;
+      setResources(
+        (res.data ?? []).map((r) => ({
+          id: r.id,
+          title: r.title,
+          category: r.category,
+          note: r.note,
+          from: r.therapist_name,
+          date: formatDate(r.shared_at),
+        }))
+      );
+      setStories(
+        (sto.data ?? []).map((s) => ({
+          id: s.id,
+          title: s.title,
+          story: s.story,
+          from: s.therapist_name,
+          date: formatDate(s.occurred_at),
+        }))
+      );
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [child?.id]);
+
+  // Therapist name for the tab label / intro — derived from the loaded content.
+  const therapistName =
+    resources[0]?.from || stories[0]?.from || (isSupabaseConfigured ? 'your therapist' : family.therapistName);
+
   const tabs = [
-    { key: 'resources', label: `From ${family.therapistName}` },
+    { key: 'resources', label: `From ${therapistName}` },
     { key: 'stories', label: 'Success Stories' },
   ];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScreenHeader title={`For ${family.childName}`} />
+      <ScreenHeader title={`For ${childName}`} />
 
-      {/* Segmented tabs */}
       <View style={styles.segmentWrap}>
         <View style={styles.segment}>
           {tabs.map((t) => {
@@ -79,7 +145,7 @@ export default function ForChildScreen() {
                 onPress={() => setTab(t.key)}
                 style={[styles.segmentButton, active && styles.segmentButtonActive]}
               >
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={1}>
                   {t.label}
                 </Text>
               </Pressable>
@@ -89,25 +155,30 @@ export default function ForChildScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {tab === 'resources' ? (
+        {loading ? (
+          <ActivityIndicator color={colors.ink} style={styles.loader} />
+        ) : tab === 'resources' ? (
           <>
             <Text style={styles.intro}>
-              Resources {family.therapistName} has shared just for {family.childName} — these
-              aren't in the general library.
+              Resources {therapistName} has shared just for {childName} — these aren't in the
+              general library.
             </Text>
-            {THERAPIST_RESOURCES.map((r) => (
-              <TherapistResourceCard key={r.id} resource={r} />
-            ))}
+            {resources.length === 0 ? (
+              <Text style={styles.empty}>Nothing shared yet — check back soon.</Text>
+            ) : (
+              resources.map((r) => <TherapistResourceCard key={r.id} resource={r} />)
+            )}
           </>
         ) : (
           <>
             <Text style={styles.intro}>
-              Wins and milestones {family.therapistName} has noted for {family.childName} along
-              the way.
+              Wins and milestones {therapistName} has noted for {childName} along the way.
             </Text>
-            {SUCCESS_STORIES.map((s) => (
-              <SuccessStoryCard key={s.id} story={s} />
-            ))}
+            {stories.length === 0 ? (
+              <Text style={styles.empty}>No stories yet — they'll appear here.</Text>
+            ) : (
+              stories.map((s) => <SuccessStoryCard key={s.id} story={s} />)
+            )}
           </>
         )}
       </ScrollView>
@@ -119,6 +190,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper },
   scroll: { paddingHorizontal: 20, paddingBottom: 24, gap: 12 },
   pressed: { opacity: 0.9 },
+  loader: { marginTop: 40 },
+  empty: { fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 8 },
 
   segmentWrap: { paddingHorizontal: 20, marginBottom: 16 },
   segment: {
@@ -131,6 +204,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: 999,
   },
   segmentButtonActive: { backgroundColor: colors.white },
