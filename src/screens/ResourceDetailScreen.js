@@ -1,11 +1,12 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, Download, Leaf } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
 import { AUD } from '../data/mockData';
 import { useCart } from '../state/CartContext';
 import { useResources } from '../state/ResourcesContext';
+import { openStorageFile } from '../lib/fileAccess';
 import CategoryBadge from '../components/CategoryBadge';
 import PriceTag from '../components/PriceTag';
 
@@ -13,6 +14,8 @@ export default function ResourceDetailScreen({ route }) {
   const { getById } = useResources();
   const resource = getById(route.params?.id);
   const { inCart, addToCart, isOwned } = useCart();
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState(null);
 
   if (!resource) {
     return (
@@ -25,6 +28,14 @@ export default function ResourceDetailScreen({ route }) {
   const meta = CATEGORY_META[resource.category];
   const added = inCart(resource.id);
   const owned = isOwned(resource.id);
+
+  const handleOpen = async () => {
+    setOpenError(null);
+    setOpening(true);
+    const { error } = await openStorageFile('resource-files', resource.fileUrl);
+    setOpening(false);
+    if (error) setOpenError(error);
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -74,10 +85,27 @@ export default function ResourceDetailScreen({ route }) {
             )}
           </Pressable>
         ) : (
-          <Pressable style={({ pressed }) => [styles.cta, styles.ctaOwned, pressed && styles.pressed]}>
-            <Download size={16} color={colors.white} />
-            <Text style={styles.ctaText}>Open resource</Text>
-          </Pressable>
+          <>
+            <Pressable
+              onPress={handleOpen}
+              disabled={opening}
+              style={({ pressed }) => [
+                styles.cta,
+                styles.ctaOwned,
+                (pressed || opening) && styles.pressed,
+              ]}
+            >
+              {opening ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <>
+                  <Download size={16} color={colors.white} />
+                  <Text style={styles.ctaText}>Open resource</Text>
+                </>
+              )}
+            </Pressable>
+            {openError ? <Text style={styles.openError}>{openError}</Text> : null}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -134,4 +162,11 @@ const styles = StyleSheet.create({
   ctaOwned: { backgroundColor: colors.ink },
   ctaText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.white },
   pressed: { opacity: 0.9 },
+  openError: {
+    marginTop: 10,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: '#B3261E',
+    textAlign: 'center',
+  },
 });

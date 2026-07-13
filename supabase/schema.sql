@@ -157,3 +157,49 @@ create policy "success_stories_select_own" on public.success_stories
 -- Note: therapist_resources and success_stories are written by you (the
 -- business owner) via the Supabase table editor, so they intentionally have no
 -- family-facing insert/update policies — families get read-only access.
+
+-- ---------------------------------------------------------------------------
+-- File storage
+-- ---------------------------------------------------------------------------
+-- Two private buckets. Upload files yourself in the dashboard (Storage →
+-- resource-files / therapist-files), then paste the file's path into the
+-- matching row's file_url column (Table editor). The app asks Storage for a
+-- short-lived signed URL each time someone taps "Open resource" — nothing is
+-- public, and the policies below only allow a family to fetch a file it has
+-- actually purchased (resource-files) or that was shared with its own child
+-- (therapist-files).
+insert into storage.buckets (id, name, public)
+values ('resource-files', 'resource-files', false)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('therapist-files', 'therapist-files', false)
+on conflict (id) do nothing;
+
+alter table storage.objects enable row level security;
+
+drop policy if exists "resource_files_select_if_purchased" on storage.objects;
+create policy "resource_files_select_if_purchased" on storage.objects
+  for select using (
+    bucket_id = 'resource-files'
+    and exists (
+      select 1
+      from public.purchases p
+      join public.resources r on r.id = p.resource_id
+      where p.family_id = auth.uid()
+        and r.file_url = storage.objects.name
+    )
+  );
+
+drop policy if exists "therapist_files_select_if_own_child" on storage.objects;
+create policy "therapist_files_select_if_own_child" on storage.objects
+  for select using (
+    bucket_id = 'therapist-files'
+    and exists (
+      select 1
+      from public.therapist_resources tr
+      join public.children c on c.id = tr.child_id
+      where c.family_id = auth.uid()
+        and tr.file_url = storage.objects.name
+    )
+  );

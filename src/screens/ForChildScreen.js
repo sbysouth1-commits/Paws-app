@@ -5,6 +5,7 @@ import { Award, CalendarDays, Download } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
 import { THERAPIST_RESOURCES, SUCCESS_STORIES, family } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { openStorageFile } from '../lib/fileAccess';
 import { useChild } from '../state/ChildContext';
 import ScreenHeader from '../components/ScreenHeader';
 import PawIcon from '../components/PawIcon';
@@ -28,6 +29,17 @@ function formatDate(value) {
 
 function TherapistResourceCard({ resource }) {
   const meta = CATEGORY_META[resource.category] ?? CATEGORY_META.Behaviour;
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState(null);
+
+  const handleOpen = async () => {
+    setOpenError(null);
+    setOpening(true);
+    const { error } = await openStorageFile('therapist-files', resource.fileUrl);
+    setOpening(false);
+    if (error) setOpenError(error);
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -42,10 +54,21 @@ function TherapistResourceCard({ resource }) {
         </View>
       </View>
       <Text style={styles.note}>{resource.note}</Text>
-      <Pressable style={({ pressed }) => [styles.openButton, pressed && styles.pressed]}>
-        <Download size={13} color={colors.white} />
-        <Text style={styles.openButtonText}>Open resource</Text>
+      <Pressable
+        onPress={handleOpen}
+        disabled={opening}
+        style={({ pressed }) => [styles.openButton, (pressed || opening) && styles.pressed]}
+      >
+        {opening ? (
+          <ActivityIndicator color={colors.white} size="small" />
+        ) : (
+          <>
+            <Download size={13} color={colors.white} />
+            <Text style={styles.openButtonText}>Open resource</Text>
+          </>
+        )}
       </Pressable>
+      {openError ? <Text style={styles.openErrorText}>{openError}</Text> : null}
     </View>
   );
 }
@@ -104,6 +127,7 @@ export default function ForChildScreen() {
           note: r.note,
           from: r.therapist_name,
           date: formatDate(r.shared_at),
+          fileUrl: r.file_url,
         }))
       );
       setStories(
@@ -252,6 +276,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
   },
   openButtonText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.white },
+  openErrorText: {
+    marginTop: 8,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: '#B3261E',
+  },
 
   storyCard: { backgroundColor: colors.sageLight },
   storyTile: { backgroundColor: colors.white },

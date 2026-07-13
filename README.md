@@ -15,9 +15,9 @@ Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, 
 
 - **Home** — brand row, greeting, Kid Mode card, "From Priya" promo, "Picked for Miller's age" list (live from Supabase), browse-by-focus-area tiles
 - **Library** — full catalogue read from Supabase, category filter chips (Speech / OT / Sensory / Behaviour), static search bar, loading/retry states
-- **Resource Detail** — preview, blurb, dashed AUD price tag, working Add-to-cart (mock state), "Open resource" when owned
+- **Resource Detail** — preview, blurb, dashed AUD price tag, working Add-to-cart; "Open resource" when owned fetches a short-lived signed URL from Supabase Storage and opens the file
 - **Cart** — line items, remove, total; "Pay with card" saves the purchase to Supabase (owned resources persist across reloads), with mock fallback when there are no keys
-- **For [Child]** — segmented tabs reading the child's private `therapist_resources` and `success_stories` from Supabase (mock fallback with no keys). After login, a one-time onboarding step collects the parent's name and creates the child profile; those names then drive the Home greeting, tab label, Kid Mode and Profile
+- **For [Child]** — segmented tabs reading the child's private `therapist_resources` and `success_stories` from Supabase (mock fallback with no keys), each with a working "Open resource" download. After login, a one-time onboarding step collects the parent's name and creates the child profile; those names then drive the Home greeting, tab label, Kid Mode and Profile
 - **Profile** — parent account card, purchase history (tap to open, from the mock cart), settings rows, and a working link out to pawsitivekids.com.au
 - **Kid Mode** — simplified big-button grid of the child's unlocked activities, lock button to hand control back, and a full-screen activity preview. No purchasing or external links, per the spec
 
@@ -28,6 +28,7 @@ App.js                        entry point; loads fonts, wraps app in AuthProvide
 src/theme/colors.js            prototype design tokens + CATEGORY_META
 src/data/mockData.js           catalogue, therapist drops, success stories (from the prototype)
 src/lib/supabase.js            Supabase client (null until keys are set)
+src/lib/fileAccess.js          signed-URL download helper for Storage files
 src/state/AuthContext.js       Supabase session/login state
 src/state/ChildContext.js      parent name + child profile loader/creator (Supabase, or mock)
 src/state/ResourcesContext.js  catalogue loader (Supabase, or mock fallback)
@@ -61,20 +62,40 @@ the `resources` catalogue live from Supabase** — edit a row in the Table edito
 shows up in the app on next launch. You (the business owner) add therapist resources and
 success stories directly via the Supabase **Table editor** too.
 
+## Uploading a resource file (so "Open resource" has something to open)
+
+`schema.sql` creates two **private** Storage buckets: `resource-files` (the paid
+catalogue) and `therapist-files` (private per-child drops). Nothing in either bucket
+is public — a family can only fetch a file it has actually purchased, or that was
+shared with its own child; the app requests a signed URL that expires a few minutes
+after it's generated.
+
+To attach a file to a resource:
+
+1. Dashboard → **Storage** → open **resource-files** (or **therapist-files** for a
+   therapist drop) → **Upload file** → pick the PDF.
+2. Click the uploaded file and copy its **path** (e.g. `big-feelings-toolkit.pdf` —
+   just the file name if you uploaded to the bucket root).
+3. Dashboard → **Table editor** → open the matching row in `resources` (or
+   `therapist_resources`) → paste that exact path into the **file_url** column → Save.
+4. In the app, reload the screen and tap **Open resource** — it opens in an in-app
+   browser, where the phone's own PDF viewer/share sheet takes over.
+
+The path in `file_url` must match the uploaded file's path exactly — that's what the
+security policy checks against.
+
 ## Next steps (per the spec)
 
-Auth, the child profile, live catalogue, persisted purchases, and private
-therapist content are all wired up. To test the For [Child] screen with sample
-data, run `supabase/sample_child_content.sql` after adding your child. Remaining:
+Auth, the child profile, live catalogue, persisted purchases, private therapist
+content, and file downloads are all wired up. To test the For [Child] screen with
+sample data, run `supabase/sample_child_content.sql` after adding your child.
+Remaining:
 
-1. File storage + download: store real resource PDFs in Supabase Storage and make
-   the "Open resource" buttons open them.
-2. Add Stripe checkout last, so "Pay with card" takes a real AUD payment before
-   the purchase is recorded.
+1. Add Stripe checkout, so "Pay with card" takes a real AUD payment before the
+   purchase is recorded — the last piece of V1.
 
 ## Notes
 
 - Dependency versions target **Expo SDK 54** — the version the Play Store/App Store build of Expo Go supports as of July 2026 (Expo skipped store releases for 55/56; a 57 build is in review). If a newer SDK is out when you pull this down, `npx expo install --fix` will bump the pinned packages.
 - With Supabase configured, the catalogue comes from the `resources` table; with no keys, the app falls back to the mock catalogue in `src/data/mockData.js`. Both go through `src/state/ResourcesContext.js`.
 - `.env` is gitignored (never commit real keys); `.env.example` shows the shape. The Supabase `anon`/publishable key is safe in a client app — row-level security protects the data.
-- `.env` is gitignored (never commit real keys); `.env.example` shows the shape. The Supabase `anon` key is safe in a client app — row-level security protects the data.
