@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronRight, Download, Globe } from 'lucide-react-native';
+import { ChevronRight, Download, Globe, LogOut } from 'lucide-react-native';
 import { colors, fonts } from '../theme/colors';
 import { family } from '../data/mockData';
 import { useCart } from '../state/CartContext';
+import { useAuth } from '../state/AuthContext';
 import ScreenHeader from '../components/ScreenHeader';
 import CategoryBadge from '../components/CategoryBadge';
 
@@ -13,6 +14,7 @@ const WEBSITE = 'https://pawsitivekids.com.au';
 
 export default function ProfileScreen({ navigation }) {
   const { purchases } = useCart();
+  const { supabaseEnabled, user, signOut } = useAuth();
   const avatarInitial = family.parentName.charAt(0).toUpperCase();
 
   return (
@@ -29,6 +31,9 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.accountSub}>
               1 child profile · {family.childName} ({family.childAge} yrs)
             </Text>
+            {supabaseEnabled && user?.email ? (
+              <Text style={styles.accountEmail}>{user.email}</Text>
+            ) : null}
           </View>
         </View>
 
@@ -76,6 +81,16 @@ export default function ProfileScreen({ navigation }) {
           <ChevronRight size={16} color={colors.clay} />
         </Pressable>
 
+        {supabaseEnabled ? (
+          <Pressable
+            onPress={signOut}
+            style={({ pressed }) => [styles.signOutRow, pressed && styles.pressed]}
+          >
+            <LogOut size={16} color={colors.rose} />
+            <Text style={styles.signOutLabel}>Sign out</Text>
+          </Pressable>
+        ) : null}
+
         <Text style={styles.footer}>Pawsitive Kids · pawsitivekids.com.au</Text>
       </ScrollView>
     </SafeAreaView>
@@ -110,6 +125,7 @@ const styles = StyleSheet.create({
   accountText: { flex: 1, minWidth: 0 },
   accountName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.ink },
   accountSub: { marginTop: 2, fontFamily: fonts.body, fontSize: 12, color: colors.inkSoft },
+  accountEmail: { marginTop: 1, fontFamily: fonts.body, fontSize: 11, color: colors.sage },
 
   sectionTitle: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.ink, marginBottom: 10 },
 
@@ -143,6 +159,16 @@ const styles = StyleSheet.create({
   settingLabel: { fontFamily: fonts.body, fontSize: 14, color: colors.ink },
   websiteLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   websiteLabel: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.clay },
+
+  signOutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    marginTop: 4,
+  },
+  signOutLabel: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.rose },
 
   footer: {
     fontFamily: fonts.body,
