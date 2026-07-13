@@ -13,10 +13,12 @@
 
 -- One row per parent account. id matches the Supabase auth user id.
 create table if not exists public.families (
-  id         uuid primary key references auth.users (id) on delete cascade,
-  email      text,
-  created_at timestamptz not null default now()
+  id          uuid primary key references auth.users (id) on delete cascade,
+  email       text,
+  parent_name text,
+  created_at  timestamptz not null default now()
 );
+alter table public.families add column if not exists parent_name text;
 
 -- One child per family in V1 (schema already allows more).
 create table if not exists public.children (

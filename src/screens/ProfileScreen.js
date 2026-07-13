@@ -3,7 +3,6 @@ import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Download, Globe, LogOut } from 'lucide-react-native';
 import { colors, fonts } from '../theme/colors';
-import { family } from '../data/mockData';
 import { useCart } from '../state/CartContext';
 import { useAuth } from '../state/AuthContext';
 import { useChild } from '../state/ChildContext';
@@ -16,11 +15,8 @@ const WEBSITE = 'https://pawsitivekids.com.au';
 export default function ProfileScreen({ navigation }) {
   const { purchases } = useCart();
   const { supabaseEnabled, user, signOut } = useAuth();
-  const { childName, childAge } = useChild();
-  // No parent name is collected yet, so fall back to the email's local part in
-  // live mode (and the mock name otherwise).
-  const parentName = supabaseEnabled ? user?.email?.split('@')[0] || 'Parent' : family.parentName;
-  const avatarInitial = parentName.charAt(0).toUpperCase();
+  const { childName, childAge, parentName } = useChild();
+  const avatarInitial = (parentName || 'P').charAt(0).toUpperCase();
   const childSummary = childAge ? `${childName} (${childAge} yrs)` : childName;
 
   return (

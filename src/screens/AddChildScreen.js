@@ -15,36 +15,40 @@ import { colors, fonts } from '../theme/colors';
 import { useChild } from '../state/ChildContext';
 import PawIcon from '../components/PawIcon';
 
-// One-time onboarding: create the family's child profile. Shown after login
-// when no child exists yet.
+// One-time onboarding: collect the parent's name and create the family's
+// child profile. Shown after login when either is missing.
 export default function AddChildScreen() {
-  const { saveChild } = useChild();
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('');
-  const [focusArea, setFocusArea] = useState('');
+  const { saveProfile } = useChild();
+  const [parentName, setParentName] = useState('');
+  const [childName, setChildName] = useState('');
+  const [childAge, setChildAge] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   const submit = async () => {
     setError(null);
-    if (!name.trim()) {
+    if (!parentName.trim()) {
+      setError('Please enter your name.');
+      return;
+    }
+    if (!childName.trim()) {
       setError("Please enter your child's name.");
       return;
     }
-    const parsedAge = age.trim() ? parseInt(age, 10) : null;
-    if (age.trim() && (Number.isNaN(parsedAge) || parsedAge < 0 || parsedAge > 18)) {
+    const parsedAge = childAge.trim() ? parseInt(childAge, 10) : null;
+    if (childAge.trim() && (Number.isNaN(parsedAge) || parsedAge < 0 || parsedAge > 18)) {
       setError('Please enter an age between 0 and 18.');
       return;
     }
     setBusy(true);
-    const { error: saveError } = await saveChild({
-      name: name.trim(),
-      age: parsedAge,
-      focusArea: focusArea.trim() || null,
+    const { error: saveError } = await saveProfile({
+      parentName: parentName.trim(),
+      childName: childName.trim(),
+      childAge: parsedAge,
     });
     setBusy(false);
     if (saveError) setError(saveError);
-    // On success the ChildProvider sets the child and the app moves on.
+    // On success the ChildProvider sets parentName/child and the app moves on.
   };
 
   return (
@@ -58,18 +62,28 @@ export default function AddChildScreen() {
             <View style={styles.logo}>
               <PawIcon size={34} color={colors.clay} />
             </View>
-            <Text style={styles.title}>Add your child</Text>
+            <Text style={styles.title}>Tell us about your family</Text>
             <Text style={styles.subtitle}>
-              We'll personalise resources and their therapist's updates for them.
+              We'll personalise resources and your therapist's updates for you.
             </Text>
           </View>
 
           <View style={styles.form}>
+            <Text style={styles.label}>Your name</Text>
+            <TextInput
+              style={styles.input}
+              value={parentName}
+              onChangeText={setParentName}
+              placeholder="e.g. Sarah"
+              placeholderTextColor={colors.inkSoft}
+              autoCapitalize="words"
+            />
+
             <Text style={styles.label}>Child's name</Text>
             <TextInput
               style={styles.input}
-              value={name}
-              onChangeText={setName}
+              value={childName}
+              onChangeText={setChildName}
               placeholder="e.g. Miller"
               placeholderTextColor={colors.inkSoft}
               autoCapitalize="words"
@@ -78,21 +92,12 @@ export default function AddChildScreen() {
             <Text style={styles.label}>Age (optional)</Text>
             <TextInput
               style={styles.input}
-              value={age}
-              onChangeText={setAge}
+              value={childAge}
+              onChangeText={setChildAge}
               placeholder="e.g. 6"
               placeholderTextColor={colors.inkSoft}
               keyboardType="number-pad"
               maxLength={2}
-            />
-
-            <Text style={styles.label}>Focus area (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={focusArea}
-              onChangeText={setFocusArea}
-              placeholder="e.g. Speech, Sensory"
-              placeholderTextColor={colors.inkSoft}
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -130,7 +135,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  title: { fontFamily: fonts.heading, fontSize: 24, color: colors.ink },
+  title: { fontFamily: fonts.heading, fontSize: 24, color: colors.ink, textAlign: 'center' },
   subtitle: {
     marginTop: 6,
     fontFamily: fonts.body,

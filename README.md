@@ -17,7 +17,7 @@ Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, 
 - **Library** — full catalogue read from Supabase, category filter chips (Speech / OT / Sensory / Behaviour), static search bar, loading/retry states
 - **Resource Detail** — preview, blurb, dashed AUD price tag, working Add-to-cart (mock state), "Open resource" when owned
 - **Cart** — line items, remove, total; "Pay with card" saves the purchase to Supabase (owned resources persist across reloads), with mock fallback when there are no keys
-- **For [Child]** — segmented tabs reading the child's private `therapist_resources` and `success_stories` from Supabase (mock fallback with no keys). After login, a one-time **Add your child** step creates the child profile; that child's name then drives the greeting, tab label, Kid Mode and Profile
+- **For [Child]** — segmented tabs reading the child's private `therapist_resources` and `success_stories` from Supabase (mock fallback with no keys). After login, a one-time onboarding step collects the parent's name and creates the child profile; those names then drive the Home greeting, tab label, Kid Mode and Profile
 - **Profile** — parent account card, purchase history (tap to open, from the mock cart), settings rows, and a working link out to pawsitivekids.com.au
 - **Kid Mode** — simplified big-button grid of the child's unlocked activities, lock button to hand control back, and a full-screen activity preview. No purchasing or external links, per the spec
 
@@ -29,7 +29,7 @@ src/theme/colors.js            prototype design tokens + CATEGORY_META
 src/data/mockData.js           catalogue, therapist drops, success stories (from the prototype)
 src/lib/supabase.js            Supabase client (null until keys are set)
 src/state/AuthContext.js       Supabase session/login state
-src/state/ChildContext.js      child profile loader/creator (Supabase, or mock)
+src/state/ChildContext.js      parent name + child profile loader/creator (Supabase, or mock)
 src/state/ResourcesContext.js  catalogue loader (Supabase, or mock fallback)
 src/state/CartContext.js       cart + purchases (reads/writes Supabase `purchases`)
 src/components/                PawIcon, ResourceCard, CategoryBadge, PriceTag, ScreenHeader
@@ -47,6 +47,8 @@ Go with no setup. To turn on real accounts:
 1. Create a free project at [supabase.com](https://supabase.com).
 2. In the dashboard: **SQL Editor → New query**, paste in `supabase/schema.sql`, Run.
    Then do the same with `supabase/seed.sql` to fill the resource catalogue.
+   (`schema.sql` is safe to re-run any time it changes — e.g. after pulling an
+   update that adds a column — it only adds what's missing.)
 3. For easy testing, turn off email confirmation: **Authentication → Sign In / Providers
    → Email → disable "Confirm email"** (turn it back on before real launch).
 4. Copy `.env.example` to `.env` and fill in the two values from **Project Settings → API**

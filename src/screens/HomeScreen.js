@@ -3,8 +3,6 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Sparkles } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
-import { family } from '../data/mockData';
-import { isSupabaseConfigured } from '../lib/supabase';
 import { useResources } from '../state/ResourcesContext';
 import { useChild } from '../state/ChildContext';
 import PawIcon from '../components/PawIcon';
@@ -12,11 +10,8 @@ import ResourceCard from '../components/ResourceCard';
 
 export default function HomeScreen({ navigation }) {
   const { resources, loading } = useResources();
-  const { childName, therapistName } = useChild();
+  const { childName, therapistName, parentName } = useChild();
   const featured = resources.slice(0, 3);
-  // We don't collect the parent's name yet, so only personalise the greeting
-  // in mock mode; live mode greets without a name.
-  const greetingName = isSupabaseConfigured ? '' : family.parentName;
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -28,7 +23,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* Greeting */}
         <View style={styles.greetingBlock}>
-          <Text style={styles.greeting}>G'day{greetingName ? `, ${greetingName}` : ''} 👋</Text>
+          <Text style={styles.greeting}>G'day{parentName ? `, ${parentName}` : ''} 👋</Text>
           <Text style={styles.headline}>Resources for {childName}</Text>
         </View>
 
