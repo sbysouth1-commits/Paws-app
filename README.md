@@ -16,7 +16,7 @@ Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, 
 - **Home** — brand row, greeting, Kid Mode card, "From Priya" promo, "Picked for Miller's age" list (live from Supabase), browse-by-focus-area tiles
 - **Library** — full catalogue read from Supabase, category filter chips (Speech / OT / Sensory / Behaviour), static search bar, loading/retry states
 - **Resource Detail** — preview, blurb, dashed AUD price tag, working Add-to-cart (mock state), "Open resource" when owned
-- **Cart** — line items, remove, total, mock "Pay with card" checkout that unlocks purchases
+- **Cart** — line items, remove, total; "Pay with card" saves the purchase to Supabase (owned resources persist across reloads), with mock fallback when there are no keys
 - **For [Child]** — segmented tabs: private resources from the therapist (with notes + open button) and success stories. The child/therapist names come from `family` in `mockData.js`, so nothing is hardcoded to "Miller"
 - **Profile** — parent account card, purchase history (tap to open, from the mock cart), settings rows, and a working link out to pawsitivekids.com.au
 - **Kid Mode** — simplified big-button grid of the child's unlocked activities, lock button to hand control back, and a full-screen activity preview. No purchasing or external links, per the spec
@@ -30,7 +30,7 @@ src/data/mockData.js           catalogue, therapist drops, success stories (from
 src/lib/supabase.js            Supabase client (null until keys are set)
 src/state/AuthContext.js       Supabase session/login state
 src/state/ResourcesContext.js  catalogue loader (Supabase, or mock fallback)
-src/state/CartContext.js       mock cart + purchases state
+src/state/CartContext.js       cart + purchases (reads/writes Supabase `purchases`)
 src/components/                PawIcon, ResourceCard, CategoryBadge, PriceTag, ScreenHeader
 src/screens/                   Auth, Home, Library, ResourceDetail, Cart, ForChild, Profile, KidMode
 src/navigation/RootNavigator.js  bottom tabs + stack for detail and Kid Mode
@@ -60,13 +60,12 @@ success stories directly via the Supabase **Table editor** too.
 
 ## Next steps (per the spec)
 
-Auth + live catalogue are wired up. Next:
+Auth, live catalogue and persisted purchases are wired up. Next:
 
-1. Save purchases to the `purchases` table (and load owned resources from it) instead of
-   the in-memory mock cart.
-2. Add a one-time child-profile step, then load `therapist_resources` / `success_stories`
-   for the For [Child] screen.
-3. Add Stripe checkout last, once the rest of the app works against real data.
+1. Add a one-time child-profile step (write to `children`), then load
+   `therapist_resources` / `success_stories` for the For [Child] screen.
+2. Add Stripe checkout last, so "Pay with card" takes a real AUD payment before
+   the purchase is recorded.
 
 ## Notes
 

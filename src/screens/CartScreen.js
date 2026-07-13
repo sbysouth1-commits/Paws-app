@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, Trash2 } from 'lucide-react-native';
 import { colors, fonts } from '../theme/colors';
@@ -8,12 +8,26 @@ import { useCart } from '../state/CartContext';
 import ScreenHeader from '../components/ScreenHeader';
 import CategoryBadge from '../components/CategoryBadge';
 
-// Mock checkout matching the prototype — "Pay with card" becomes real Stripe
-// checkout in a later build pass.
+// Records the purchase against the family's account. "Pay with card" becomes a
+// real Stripe charge in a later build pass — for now it just saves the purchase.
 export default function CartScreen() {
   const { cart, removeFromCart, checkout } = useCart();
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
   const total = cart.reduce((s, r) => s + r.price, 0);
+
+  const onPay = async () => {
+    setError(null);
+    setBusy(true);
+    const { error: checkoutError } = await checkout();
+    setBusy(false);
+    if (checkoutError) {
+      setError(checkoutError);
+      return;
+    }
+    setDone(true);
+  };
 
   if (done) {
     return (
@@ -65,14 +79,17 @@ export default function CartScreen() {
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>{AUD(total)}</Text>
           </View>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable
-            onPress={() => {
-              checkout();
-              setDone(true);
-            }}
-            style={({ pressed }) => [styles.payButton, pressed && styles.pressed]}
+            onPress={onPay}
+            disabled={busy}
+            style={({ pressed }) => [styles.payButton, (pressed || busy) && styles.pressed]}
           >
-            <Text style={styles.payText}>Pay with card</Text>
+            {busy ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.payText}>Pay with card</Text>
+            )}
           </Pressable>
         </ScrollView>
       )}
@@ -126,6 +143,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.clay,
   },
   payText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.white },
+  error: {
+    marginBottom: 10,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    color: '#B3261E',
+    textAlign: 'center',
+  },
 
   doneWrap: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 72 },
   doneIcon: {
