@@ -16,7 +16,7 @@ Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, 
 - **Home** — brand row, greeting, Kid Mode card, "From Priya" promo, "Picked for Miller's age" list (live from Supabase), browse-by-focus-area tiles
 - **Library** — full catalogue read from Supabase, category filter chips (Speech / OT / Sensory / Behaviour), static search bar, loading/retry states
 - **Resource Detail** — preview, blurb, dashed AUD price tag, working Add-to-cart; "Open resource" when owned fetches a short-lived signed URL from Supabase Storage and opens the file
-- **Cart** — line items, remove, total; "Pay with card" saves the purchase to Supabase (owned resources persist across reloads), with mock fallback when there are no keys
+- **Cart** — line items, remove, total; "Pay with card" opens a real Stripe Checkout page (AUD) and the purchase is only recorded once Stripe confirms payment, with an instant mock checkout when there are no keys
 - **For [Child]** — segmented tabs reading the child's private `therapist_resources` and `success_stories` from Supabase (mock fallback with no keys), each with a working "Open resource" download. After login, a one-time onboarding step collects the parent's name and creates the child profile; those names then drive the Home greeting, tab label, Kid Mode and Profile
 - **Profile** — parent account card, purchase history (tap to open, from the mock cart), settings rows, and a working link out to pawsitivekids.com.au
 - **Kid Mode** — simplified big-button grid of the child's unlocked activities, lock button to hand control back, and a full-screen activity preview. No purchasing or external links, per the spec
@@ -32,12 +32,14 @@ src/lib/fileAccess.js          signed-URL download helper for Storage files
 src/state/AuthContext.js       Supabase session/login state
 src/state/ChildContext.js      parent name + child profile loader/creator (Supabase, or mock)
 src/state/ResourcesContext.js  catalogue loader (Supabase, or mock fallback)
-src/state/CartContext.js       cart + purchases (reads/writes Supabase `purchases`)
+src/state/CartContext.js       cart + purchases; drives Stripe Checkout, never writes purchases itself
 src/components/                PawIcon, ResourceCard, CategoryBadge, PriceTag, ScreenHeader
 src/screens/                   Auth, Home, Library, ResourceDetail, Cart, ForChild, Profile, KidMode
 src/navigation/RootNavigator.js  bottom tabs + stack for detail and Kid Mode
 supabase/schema.sql            database tables + row-level security
 supabase/seed.sql              starter catalogue rows
+supabase/functions/create-checkout-session  Edge Function: starts a Stripe Checkout session
+supabase/functions/stripe-webhook           Edge Function: records a purchase once Stripe confirms payment
 ```
 
 ## Supabase setup (auth is built — connect it to go live)
@@ -84,18 +86,94 @@ To attach a file to a resource:
 The path in `file_url` must match the uploaded file's path exactly — that's what the
 security policy checks against.
 
+## Stripe checkout setup
+
+"Pay with card" opens a **Stripe Checkout** page (Stripe's own hosted payment
+page) in the same in-app browser used for file downloads — no card-payment SDK
+in the app itself, so this still runs fine in plain Expo Go, no special build
+needed. Two Supabase **Edge Functions** do the work: one creates the Checkout
+session (using your Stripe secret key, which never touches the app), and the
+other is a **webhook** Stripe calls once payment actually succeeds — that's the
+only place a purchase ever gets recorded, so the app itself has no way to grant
+a "purchase" without a real payment behind it.
+
+Setup (all one-time):
+
+1. Create a free [stripe.com](https://stripe.com) account. Test mode needs no
+   business verification — you can build and test the whole flow before ever
+   going live.
+2. Dashboard → **Developers → API keys** → copy the **Secret key** (starts
+   `sk_test_...`). Keep this out of the app entirely — it only ever goes into
+   Supabase's secret store (next steps).
+3. Install the Supabase CLI. Easiest on any OS — no install needed, just prefix
+   every command below with `npx supabase@latest` instead of `supabase`. (If
+   you'd rather have a permanent `supabase` command on Windows, install
+   [Scoop](https://scoop.sh) first, then `scoop bucket add supabase https://github.com/supabase/scoop-bucket.git`
+   and `scoop install supabase`.)
+4. In the `Paws-app` folder:
+   ```
+   npx supabase@latest login
+   ```
+   This opens a browser to authorize, same as `eas login` did earlier.
+5. Link this project (find your **Reference ID** in the dashboard under
+   **Project Settings → General** — it's also the subdomain in your project
+   URL, e.g. `https://abcd1234.supabase.co` → ref is `abcd1234`):
+   ```
+   npx supabase@latest link --project-ref YOUR-PROJECT-REF
+   ```
+6. Set your Stripe secret key as a Supabase secret:
+   ```
+   npx supabase@latest secrets set STRIPE_SECRET_KEY=sk_test_...
+   ```
+7. Deploy both functions:
+   ```
+   npx supabase@latest functions deploy create-checkout-session
+   npx supabase@latest functions deploy stripe-webhook --no-verify-jwt
+   ```
+8. Your webhook's URL is:
+   `https://YOUR-PROJECT-REF.supabase.co/functions/v1/stripe-webhook`
+9. Stripe dashboard → **Developers → Webhooks → Add endpoint** → paste that URL
+   → under "Select events" choose **checkout.session.completed** → Add endpoint.
+10. Click into the endpoint you just created → **Reveal** the **Signing secret**
+    (starts `whsec_...`) → set it as a Supabase secret too:
+    ```
+    npx supabase@latest secrets set STRIPE_WEBHOOK_SECRET=whsec_...
+    ```
+    (No redeploy needed — secrets are read fresh on every call.)
+11. Re-run `supabase/schema.sql` in the SQL Editor (it's idempotent) to pick up
+    the new `stripe_session_id` column and the tightened purchases policy.
+12. `git pull` on your PC, then `npx expo start -c` and reload the app.
+
+**Testing:** use Stripe's test card `4242 4242 4242 4242`, any future expiry,
+any 3-digit CVC, any postal code — it always "succeeds" in test mode. After
+paying, closing the browser returns you to Cart, which checks with Supabase
+and shows "Purchase complete" once the webhook has recorded it (usually
+near-instant; the app waits and retries once if it needs to).
+
+By default, Checkout sends the shopper back to **pawsitivekids.com.au** after
+paying (a page you already control). To point somewhere else instead, set a
+`CHECKOUT_RETURN_URL` secret the same way as the others above.
+
+When you're ready to take real payments, switch your Stripe dashboard out of
+test mode, grab the **live** secret key and webhook signing secret, and repeat
+steps 6, 9 and 10 with those live values.
+
 ## Next steps (per the spec)
 
-Auth, the child profile, live catalogue, persisted purchases, private therapist
-content, and file downloads are all wired up. To test the For [Child] screen with
-sample data, run `supabase/sample_child_content.sql` after adding your child.
-Remaining:
+**V1 is feature-complete against the spec.** Everything up to and including
+Stripe is wired up: auth, one child per family, the live catalogue, real
+purchases, private therapist content, file downloads, and paid checkout. To
+test the For [Child] screen with sample data, run
+`supabase/sample_child_content.sql` after adding your child.
 
-1. Add Stripe checkout, so "Pay with card" takes a real AUD payment before the
-   purchase is recorded — the last piece of V1.
+From here, per spec §6 ("Not in V1 — revisit later"): therapist
+messaging/booking, subscriptions, multiple children per family, and a proper
+admin/therapist upload UI (for now, you add resources and files directly via
+the Supabase dashboard).
 
 ## Notes
 
 - Dependency versions target **Expo SDK 54** — the version the Play Store/App Store build of Expo Go supports as of July 2026 (Expo skipped store releases for 55/56; a 57 build is in review). If a newer SDK is out when you pull this down, `npx expo install --fix` will bump the pinned packages.
 - With Supabase configured, the catalogue comes from the `resources` table; with no keys, the app falls back to the mock catalogue in `src/data/mockData.js`. Both go through `src/state/ResourcesContext.js`.
 - `.env` is gitignored (never commit real keys); `.env.example` shows the shape. The Supabase `anon`/publishable key is safe in a client app — row-level security protects the data.
+- Stripe's secret key and webhook signing secret live only in Supabase's Edge Function secret store — never in `.env`, never in the app bundle, never committed.

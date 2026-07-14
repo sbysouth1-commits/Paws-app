@@ -9,8 +9,10 @@ import { useChild } from '../state/ChildContext';
 import ScreenHeader from '../components/ScreenHeader';
 import CategoryBadge from '../components/CategoryBadge';
 
-// Records the purchase against the family's account. "Pay with card" becomes a
-// real Stripe charge in a later build pass — for now it just saves the purchase.
+// "Pay with card" opens a Stripe Checkout session in the browser; the purchase
+// is recorded server-side once Stripe confirms the payment (see
+// supabase/functions/stripe-webhook), so this only shows success once that's
+// actually happened — not just because the browser closed.
 export default function CartScreen() {
   const { cart, removeFromCart, checkout } = useCart();
   const { childName } = useChild();
@@ -22,13 +24,17 @@ export default function CartScreen() {
   const onPay = async () => {
     setError(null);
     setBusy(true);
-    const { error: checkoutError } = await checkout();
+    const { error: checkoutError, allPaid } = await checkout();
     setBusy(false);
     if (checkoutError) {
       setError(checkoutError);
       return;
     }
-    setDone(true);
+    if (allPaid) {
+      setDone(true);
+    } else {
+      setError("Payment wasn't completed — you can try again.");
+    }
   };
 
   if (done) {

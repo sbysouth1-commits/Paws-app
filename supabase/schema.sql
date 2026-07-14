@@ -43,14 +43,18 @@ create table if not exists public.resources (
   created_at  timestamptz not null default now()
 );
 
--- What a family has bought.
+-- What a family has bought. Only ever written by the stripe-webhook Edge
+-- Function (via the service role) after Stripe confirms payment — see the
+-- policies below, which deliberately give the app no insert access.
 create table if not exists public.purchases (
-  id           uuid primary key default gen_random_uuid(),
-  family_id    uuid not null references public.families (id) on delete cascade,
-  resource_id  uuid not null references public.resources (id) on delete cascade,
-  purchased_at timestamptz not null default now(),
+  id                uuid primary key default gen_random_uuid(),
+  family_id         uuid not null references public.families (id) on delete cascade,
+  resource_id       uuid not null references public.resources (id) on delete cascade,
+  purchased_at      timestamptz not null default now(),
+  stripe_session_id text,
   unique (family_id, resource_id)
 );
+alter table public.purchases add column if not exists stripe_session_id text;
 
 -- Private resources the therapist drops for a specific child.
 create table if not exists public.therapist_resources (
@@ -132,13 +136,14 @@ drop policy if exists "resources_select_all" on public.resources;
 create policy "resources_select_all" on public.resources
   for select using (auth.role() = 'authenticated');
 
--- purchases: a family reads and creates only its own.
+-- purchases: a family reads only its own. No insert policy — the app has no
+-- way to write a purchase row; only the stripe-webhook Edge Function can
+-- (via the service role, which bypasses RLS entirely). This line intentionally
+-- drops any old insert policy from a previous version of this schema.
 drop policy if exists "purchases_select_own" on public.purchases;
 create policy "purchases_select_own" on public.purchases
   for select using (family_id = auth.uid());
 drop policy if exists "purchases_insert_own" on public.purchases;
-create policy "purchases_insert_own" on public.purchases
-  for insert with check (family_id = auth.uid());
 
 -- therapist_resources: readable only for the family's own children.
 drop policy if exists "therapist_resources_select_own" on public.therapist_resources;

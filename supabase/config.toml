@@ -1,0 +1,6 @@
+# Stripe calls stripe-webhook directly (no Supabase user is logged in when it
+# fires), so it can't carry a Supabase auth JWT — this tells the platform not
+# to require one for that function. create-checkout-session is left at the
+# default (JWT required), since only a logged-in family should call it.
+[functions.stripe-webhook]
+verify_jwt = false
