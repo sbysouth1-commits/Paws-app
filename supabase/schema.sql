@@ -49,6 +49,35 @@ alter table public.families drop constraint if exists families_role_check;
 alter table public.families add constraint families_role_check
   check (role in ('family', 'admin', 'therapist'));
 
+-- Safety net: block demoting or deleting the very last remaining admin
+-- account, so the business can never end up with zero admins by accident
+-- (whether via the in-app Team screen or a direct table edit). Because
+-- children/therapist_resources/etc. reference families with ON DELETE
+-- CASCADE, and Postgres fires BEFORE DELETE triggers as part of a cascaded
+-- delete, this also blocks deleting the last admin's auth.users row entirely
+-- (e.g. from Authentication → Users in the dashboard) — not just editing role.
+create or replace function public.prevent_last_admin_removal()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.role = 'admin' and (tg_op = 'DELETE' or new.role is distinct from 'admin') then
+    if (select count(*) from public.families where role = 'admin' and id <> old.id) = 0 then
+      raise exception 'Cannot remove the last remaining admin account.';
+    end if;
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_last_admin_removal_trigger on public.families;
+create trigger prevent_last_admin_removal_trigger
+  before update or delete on public.families
+  for each row execute function public.prevent_last_admin_removal();
+
 -- One child per family in V1 (schema already allows more). therapist_id is
 -- set by an admin (via the Team/Families admin screens) to assign the child
 -- to one of the therapist-role accounts; null until assigned.
