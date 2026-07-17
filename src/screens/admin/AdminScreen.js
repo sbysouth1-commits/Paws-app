@@ -6,43 +6,45 @@ import { Plus, ChevronRight } from 'lucide-react-native';
 import { colors, fonts } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useResources } from '../../state/ResourcesContext';
+import { useFamiliesList } from '../../lib/useFamiliesList';
 import ScreenHeader from '../../components/ScreenHeader';
 import ResourceCard from '../../components/ResourceCard';
 
 const TABS = [
   { key: 'resources', label: 'Resources' },
   { key: 'families', label: 'Families' },
+  { key: 'team', label: 'Team' },
 ];
 
-// Owner-only: manage the catalogue and drop private content onto a family's
-// child, straight from the app instead of the Supabase dashboard. Only
-// reachable when ChildContext.isAdmin is true (see ProfileScreen).
+const ROLE_LABEL = { admin: 'Admin', therapist: 'Therapist', family: 'Family' };
+
+// Admin-only: manage the catalogue, drop private content onto a family's
+// child, and manage staff roles — all from the app instead of the Supabase
+// dashboard. Only reachable when ChildContext.isAdmin is true.
 export default function AdminScreen({ navigation }) {
   const [tab, setTab] = useState('resources');
   const { resources, loading: resourcesLoading, reload: reloadResources } = useResources();
-  const [families, setFamilies] = useState([]);
-  const [familiesLoading, setFamiliesLoading] = useState(true);
+  const { families, loading: familiesLoading, reload: reloadFamilies } = useFamiliesList();
+  const [team, setTeam] = useState([]);
+  const [teamLoading, setTeamLoading] = useState(true);
 
-  const loadFamilies = useCallback(async () => {
-    setFamiliesLoading(true);
-    const [famRes, kidsRes] = await Promise.all([
-      supabase.from('families').select('id, email, parent_name'),
-      supabase.from('children').select('id, family_id, name, age'),
-    ]);
-    const kidsByFamily = new Map((kidsRes.data ?? []).map((k) => [k.family_id, k]));
-    const rows = (famRes.data ?? [])
-      .map((f) => ({ ...f, child: kidsByFamily.get(f.id) ?? null }))
-      .filter((f) => f.child); // only families that finished onboarding
-    setFamilies(rows);
-    setFamiliesLoading(false);
+  const loadTeam = useCallback(async () => {
+    setTeamLoading(true);
+    const { data } = await supabase
+      .from('families')
+      .select('id, email, parent_name, role')
+      .order('created_at', { ascending: true });
+    setTeam(data ?? []);
+    setTeamLoading(false);
   }, []);
 
   // Refresh whenever this screen regains focus, e.g. after saving a resource.
   useFocusEffect(
     useCallback(() => {
       reloadResources();
-      loadFamilies();
-    }, [loadFamilies, reloadResources])
+      reloadFamilies();
+      loadTeam();
+    }, [loadTeam, reloadFamilies, reloadResources])
   );
 
   return (
@@ -96,35 +98,67 @@ export default function AdminScreen({ navigation }) {
             )}
           />
         )
-      ) : familiesLoading ? (
+      ) : tab === 'families' ? (
+        familiesLoading ? (
+          <ActivityIndicator color={colors.ink} style={styles.loader} />
+        ) : (
+          <FlatList
+            data={families}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('FamilyDetail', {
+                    childId: item.child.id,
+                    childName: item.child.name,
+                    parentName: item.parent_name || item.email,
+                  })
+                }
+                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              >
+                <View style={styles.rowText}>
+                  <Text style={styles.rowTitle}>{item.parent_name || item.email}</Text>
+                  <Text style={styles.rowSub}>
+                    {item.child.name}
+                    {item.child.age ? ` (${item.child.age} yrs)` : ''}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.inkSoft} />
+              </Pressable>
+            )}
+            ListEmptyComponent={<Text style={styles.empty}>No families have onboarded yet.</Text>}
+          />
+        )
+      ) : teamLoading ? (
         <ActivityIndicator color={colors.ink} style={styles.loader} />
       ) : (
         <FlatList
-          data={families}
+          data={team}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <Pressable
               onPress={() =>
-                navigation.navigate('FamilyDetail', {
-                  childId: item.child.id,
-                  childName: item.child.name,
-                  parentName: item.parent_name || item.email,
+                navigation.navigate('TeamMember', {
+                  id: item.id,
+                  email: item.email,
+                  parentName: item.parent_name,
+                  role: item.role,
                 })
               }
-              style={({ pressed }) => [styles.familyRow, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
             >
-              <View style={styles.familyText}>
-                <Text style={styles.familyName}>{item.parent_name || item.email}</Text>
-                <Text style={styles.familyChild}>
-                  {item.child.name}
-                  {item.child.age ? ` (${item.child.age} yrs)` : ''}
-                </Text>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>{item.parent_name || item.email}</Text>
+                <Text style={styles.rowSub}>{item.email}</Text>
               </View>
-              <ChevronRight size={18} color={colors.inkSoft} />
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText}>{ROLE_LABEL[item.role] ?? item.role}</Text>
+              </View>
             </Pressable>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No families have onboarded yet.</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>Nobody's signed up yet.</Text>}
         />
       )}
     </SafeAreaView>
@@ -166,7 +200,7 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
 
-  familyRow: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -176,7 +210,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  familyText: { flex: 1, minWidth: 0 },
-  familyName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.ink },
-  familyChild: { marginTop: 2, fontFamily: fonts.body, fontSize: 12, color: colors.inkSoft },
+  rowText: { flex: 1, minWidth: 0 },
+  rowTitle: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.ink },
+  rowSub: { marginTop: 2, fontFamily: fonts.body, fontSize: 12, color: colors.inkSoft },
+
+  roleBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.sageLight,
+  },
+  roleBadgeText: { fontFamily: fonts.bodySemiBold, fontSize: 11, color: colors.ink },
 });

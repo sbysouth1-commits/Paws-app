@@ -19,6 +19,8 @@ import ResourceFormScreen from '../screens/admin/ResourceFormScreen';
 import FamilyDetailScreen from '../screens/admin/FamilyDetailScreen';
 import TherapistResourceFormScreen from '../screens/admin/TherapistResourceFormScreen';
 import SuccessStoryFormScreen from '../screens/admin/SuccessStoryFormScreen';
+import TeamMemberScreen from '../screens/admin/TeamMemberScreen';
+import AssignTherapistScreen from '../screens/admin/AssignTherapistScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -124,6 +126,12 @@ export default function RootNavigator() {
         <Stack.Screen
           name="SuccessStoryForm"
           component={SuccessStoryFormScreen}
+          options={{ title: '' }}
+        />
+        <Stack.Screen name="TeamMember" component={TeamMemberScreen} options={{ title: '' }} />
+        <Stack.Screen
+          name="AssignTherapist"
+          component={AssignTherapistScreen}
           options={{ title: '' }}
         />
       </Stack.Navigator>

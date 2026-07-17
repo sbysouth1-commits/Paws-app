@@ -9,34 +9,60 @@
 --
 -- Admin access: after running this file, make your own account the business
 -- owner by running (in a new query, once you've signed up in the app):
---   update public.families set is_admin = true where email = 'you@example.com';
--- That unlocks the Admin tab in the app for that account only.
+--   update public.families set role = 'admin' where email = 'you@example.com';
+-- That unlocks the Admin tab in the app for that account. From there, admins
+-- can promote other signed-up accounts to 'admin' or 'therapist' via the
+-- in-app Team screen — no more manual SQL needed after this first one.
 
 -- ---------------------------------------------------------------------------
 -- Tables
 -- ---------------------------------------------------------------------------
 
 -- One row per parent account. id matches the Supabase auth user id.
--- is_admin marks the business owner's own account — see "Admin access" below.
+-- role marks staff accounts — see "Admin access" above. 'family' (the
+-- default) is a normal parent account; 'admin' and 'therapist' are staff.
 create table if not exists public.families (
   id          uuid primary key references auth.users (id) on delete cascade,
   email       text,
   parent_name text,
-  is_admin    boolean not null default false,
+  role        text not null default 'family',
   created_at  timestamptz not null default now()
 );
 alter table public.families add column if not exists parent_name text;
-alter table public.families add column if not exists is_admin boolean not null default false;
+alter table public.families add column if not exists role text not null default 'family';
 
--- One child per family in V1 (schema already allows more).
+-- One-time migration from the old boolean flag to the role column above.
+-- Only runs if the old column is still there, so it's a no-op after the
+-- first time this file runs against a given database.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'families' and column_name = 'is_admin'
+  ) then
+    update public.families set role = 'admin' where is_admin = true;
+    alter table public.families drop column is_admin;
+  end if;
+end $$;
+
+alter table public.families drop constraint if exists families_role_check;
+alter table public.families add constraint families_role_check
+  check (role in ('family', 'admin', 'therapist'));
+
+-- One child per family in V1 (schema already allows more). therapist_id is
+-- set by an admin (via the Team/Families admin screens) to assign the child
+-- to one of the therapist-role accounts; null until assigned.
 create table if not exists public.children (
-  id         uuid primary key default gen_random_uuid(),
-  family_id  uuid not null references public.families (id) on delete cascade,
-  name       text not null,
-  age        int,
-  focus_area text,
-  created_at timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  family_id     uuid not null references public.families (id) on delete cascade,
+  name          text not null,
+  age           int,
+  focus_area    text,
+  therapist_id  uuid references public.families (id),
+  created_at    timestamptz not null default now()
 );
+alter table public.children add column if not exists therapist_id uuid references public.families (id);
+create index if not exists children_therapist_id_idx on public.children (therapist_id);
 
 -- Public catalogue of resources for sale.
 create table if not exists public.resources (
@@ -107,17 +133,33 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Returns true if the signed-in user's own families row is flagged as admin.
--- Only ever reads the caller's own row, so this stays safe under RLS without
--- needing elevated (security definer) privileges.
+-- Role checks for the signed-in user. Each only ever reads the caller's own
+-- row (always allowed by families_select_own below), so these stay safe under
+-- RLS without needing elevated (security definer) privileges.
 create or replace function public.is_admin()
 returns boolean
 language sql
 stable
 as $$
-  select exists (
-    select 1 from public.families where id = auth.uid() and is_admin = true
-  );
+  select exists (select 1 from public.families where id = auth.uid() and role = 'admin');
+$$;
+
+create or replace function public.is_therapist()
+returns boolean
+language sql
+stable
+as $$
+  select exists (select 1 from public.families where id = auth.uid() and role = 'therapist');
+$$;
+
+-- True for either staff role — used where admins and therapists share access
+-- (e.g. reading their own families row) but their write scope still differs.
+create or replace function public.is_staff()
+returns boolean
+language sql
+stable
+as $$
+  select exists (select 1 from public.families where id = auth.uid() and role in ('admin', 'therapist'));
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -131,31 +173,54 @@ alter table public.therapist_resources enable row level security;
 alter table public.success_stories     enable row level security;
 
 -- families: a user sees and edits only their own row; the admin sees every
--- family (needed to pick a family/child in the in-app Admin section).
+-- family (needed to pick a family/child in the in-app Admin section); a
+-- therapist sees only the families whose child is assigned to them.
 drop policy if exists "families_select_own" on public.families;
 create policy "families_select_own" on public.families
   for select using (id = auth.uid());
 drop policy if exists "families_select_admin" on public.families;
 create policy "families_select_admin" on public.families
   for select using (public.is_admin());
+drop policy if exists "families_select_therapist" on public.families;
+create policy "families_select_therapist" on public.families
+  for select using (
+    public.is_therapist()
+    and id in (select family_id from public.children where therapist_id = auth.uid())
+  );
 drop policy if exists "families_update_own" on public.families;
 create policy "families_update_own" on public.families
   for update using (id = auth.uid());
+-- Admin can update any family's row — this is how the in-app Team screen
+-- promotes an account to 'admin' or 'therapist' (or demotes it back to
+-- 'family'), without needing manual SQL after the very first admin.
+drop policy if exists "families_update_admin" on public.families;
+create policy "families_update_admin" on public.families
+  for update using (public.is_admin());
 
 -- children: scoped to the owning family (family id == auth user id); the
--- admin can also see every child, for the same reason as above.
+-- admin can also see every child; a therapist sees only children assigned to
+-- them (their own clients — not every family's, per the sensitivity of this
+-- data, spec §4).
 drop policy if exists "children_select_own" on public.children;
 create policy "children_select_own" on public.children
   for select using (family_id = auth.uid());
 drop policy if exists "children_select_admin" on public.children;
 create policy "children_select_admin" on public.children
   for select using (public.is_admin());
+drop policy if exists "children_select_therapist" on public.children;
+create policy "children_select_therapist" on public.children
+  for select using (public.is_therapist() and therapist_id = auth.uid());
 drop policy if exists "children_insert_own" on public.children;
 create policy "children_insert_own" on public.children
   for insert with check (family_id = auth.uid());
 drop policy if exists "children_update_own" on public.children;
 create policy "children_update_own" on public.children
   for update using (family_id = auth.uid());
+-- Admin-only: assigning a child to a therapist (therapists can't reassign
+-- their own or anyone else's clients).
+drop policy if exists "children_update_admin" on public.children;
+create policy "children_update_admin" on public.children
+  for update using (public.is_admin());
 drop policy if exists "children_delete_own" on public.children;
 create policy "children_delete_own" on public.children
   for delete using (family_id = auth.uid());
@@ -182,9 +247,9 @@ create policy "purchases_select_own" on public.purchases
 drop policy if exists "purchases_insert_own" on public.purchases;
 
 -- therapist_resources: readable only for the family's own children. The admin
--- can read every child's, and is the only one who can add or edit them —
--- previously this required the Supabase table editor; now the in-app Admin
--- section can do it directly.
+-- can read/add/edit every child's. A therapist can read/add/edit only for
+-- children assigned to them — their own clients, not the whole business —
+-- which is the whole point of assigning a therapist to a child.
 drop policy if exists "therapist_resources_select_own" on public.therapist_resources;
 create policy "therapist_resources_select_own" on public.therapist_resources
   for select using (
@@ -193,15 +258,32 @@ create policy "therapist_resources_select_own" on public.therapist_resources
 drop policy if exists "therapist_resources_select_admin" on public.therapist_resources;
 create policy "therapist_resources_select_admin" on public.therapist_resources
   for select using (public.is_admin());
+drop policy if exists "therapist_resources_select_therapist" on public.therapist_resources;
+create policy "therapist_resources_select_therapist" on public.therapist_resources
+  for select using (
+    public.is_therapist()
+    and child_id in (select id from public.children where therapist_id = auth.uid())
+  );
 drop policy if exists "therapist_resources_insert_admin" on public.therapist_resources;
 create policy "therapist_resources_insert_admin" on public.therapist_resources
   for insert with check (public.is_admin());
+drop policy if exists "therapist_resources_insert_therapist" on public.therapist_resources;
+create policy "therapist_resources_insert_therapist" on public.therapist_resources
+  for insert with check (
+    public.is_therapist()
+    and child_id in (select id from public.children where therapist_id = auth.uid())
+  );
 drop policy if exists "therapist_resources_update_admin" on public.therapist_resources;
 create policy "therapist_resources_update_admin" on public.therapist_resources
   for update using (public.is_admin());
+drop policy if exists "therapist_resources_update_therapist" on public.therapist_resources;
+create policy "therapist_resources_update_therapist" on public.therapist_resources
+  for update using (
+    public.is_therapist()
+    and child_id in (select id from public.children where therapist_id = auth.uid())
+  );
 
--- success_stories: readable only for the family's own children; same admin
--- read/write access as therapist_resources above.
+-- success_stories: same access pattern as therapist_resources above.
 drop policy if exists "success_stories_select_own" on public.success_stories;
 create policy "success_stories_select_own" on public.success_stories
   for select using (
@@ -210,12 +292,30 @@ create policy "success_stories_select_own" on public.success_stories
 drop policy if exists "success_stories_select_admin" on public.success_stories;
 create policy "success_stories_select_admin" on public.success_stories
   for select using (public.is_admin());
+drop policy if exists "success_stories_select_therapist" on public.success_stories;
+create policy "success_stories_select_therapist" on public.success_stories
+  for select using (
+    public.is_therapist()
+    and child_id in (select id from public.children where therapist_id = auth.uid())
+  );
 drop policy if exists "success_stories_insert_admin" on public.success_stories;
 create policy "success_stories_insert_admin" on public.success_stories
   for insert with check (public.is_admin());
+drop policy if exists "success_stories_insert_therapist" on public.success_stories;
+create policy "success_stories_insert_therapist" on public.success_stories
+  for insert with check (
+    public.is_therapist()
+    and child_id in (select id from public.children where therapist_id = auth.uid())
+  );
 drop policy if exists "success_stories_update_admin" on public.success_stories;
 create policy "success_stories_update_admin" on public.success_stories
   for update using (public.is_admin());
+drop policy if exists "success_stories_update_therapist" on public.success_stories;
+create policy "success_stories_update_therapist" on public.success_stories
+  for update using (
+    public.is_therapist()
+    and child_id in (select id from public.children where therapist_id = auth.uid())
+  );
 
 -- Note: no delete policies anywhere in this file, on purpose — the Admin
 -- section can add and edit but never delete, so a mistake can't destroy a
@@ -272,13 +372,14 @@ create policy "therapist_files_select_if_own_child" on storage.objects
     )
   );
 
--- Uploads: only the admin can add files to either bucket — the Admin section
--- uploads a PDF straight from the app when you add or edit a resource / a
--- therapist drop, instead of using the dashboard's Storage uploader.
+-- Uploads: only the admin can add files to the public catalogue bucket
+-- (pricing/catalogue stays an admin-only decision). Either staff role can
+-- upload to the private therapist-files bucket, since that's per-child
+-- content therapists are meant to add themselves.
 drop policy if exists "resource_files_insert_admin" on storage.objects;
 create policy "resource_files_insert_admin" on storage.objects
   for insert with check (bucket_id = 'resource-files' and public.is_admin());
 
 drop policy if exists "therapist_files_insert_admin" on storage.objects;
 create policy "therapist_files_insert_admin" on storage.objects
-  for insert with check (bucket_id = 'therapist-files' and public.is_admin());
+  for insert with check (bucket_id = 'therapist-files' and public.is_staff());

@@ -20,7 +20,8 @@ Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, 
 - **For [Child]** — segmented tabs reading the child's private `therapist_resources` and `success_stories` from Supabase (mock fallback with no keys), each with a working "Open resource" download. After login, a one-time onboarding step collects the parent's name and creates the child profile; those names then drive the Home greeting, tab label, Kid Mode and Profile
 - **Profile** — parent account card, purchase history (tap to open, from the mock cart), settings rows, and a working link out to pawsitivekids.com.au
 - **Kid Mode** — simplified big-button grid of the child's unlocked activities, lock button to hand control back, and a full-screen activity preview. No purchasing or external links, per the spec
-- **Admin** (owner-only) — a hidden "Admin" row on Profile, visible only to your own account, for adding/editing catalogue resources and dropping therapist resources or success stories onto a specific family's child — including picking a PDF straight from your phone. Replaces the manual Supabase table-editor + Storage-upload workflow described below (that still works too, if you'd rather use the dashboard for something)
+- **Admin** (`role = 'admin'`) — a hidden "Admin" row on Profile with three tabs: catalogue resources (add/edit, with a file picker), every family (assign a therapist, add content), and Team (change anyone's role — this is how you make more admins and therapists, no more manual SQL after the first one)
+- **Therapist** (`role = 'therapist'`) — a separate pure-staff app shell (no shopping, no onboarding): sign out, and a list of just their own assigned families, using the same content screens as Admin. Row-level security keeps them scoped to their own clients only
 
 ## Structure
 
@@ -30,15 +31,19 @@ src/theme/colors.js            prototype design tokens + CATEGORY_META
 src/data/mockData.js           catalogue, therapist drops, success stories (from the prototype)
 src/lib/supabase.js            Supabase client (null until keys are set)
 src/lib/fileAccess.js          signed-URL download helper for Storage files
-src/lib/fileUpload.js          admin: pick + upload a file to a Storage bucket
+src/lib/fileUpload.js          staff: pick + upload a file to a Storage bucket
+src/lib/useFamiliesList.js     shared families+child loader (RLS-scoped per role)
 src/state/AuthContext.js       Supabase session/login state
-src/state/ChildContext.js      parent name + child profile + isAdmin (Supabase, or mock)
+src/state/ChildContext.js      parent name + child profile + role/isAdmin/isTherapist (Supabase, or mock)
 src/state/ResourcesContext.js  catalogue loader (Supabase, or mock fallback)
 src/state/CartContext.js       cart + purchases; drives Stripe Checkout, never writes purchases itself
 src/components/                PawIcon, ResourceCard, CategoryBadge, PriceTag, ScreenHeader
 src/screens/                   Auth, Home, Library, ResourceDetail, Cart, ForChild, Profile, KidMode
-src/screens/admin/             Admin, ResourceForm, FamilyDetail, TherapistResourceForm, SuccessStoryForm
-src/navigation/RootNavigator.js  bottom tabs + stack for detail, Kid Mode and Admin
+src/screens/admin/             Admin, ResourceForm, FamilyDetail, TherapistResourceForm, SuccessStoryForm,
+                                TeamMember, AssignTherapist
+src/screens/therapist/         TherapistHomeScreen — therapist-only landing screen
+src/navigation/RootNavigator.js      bottom tabs + stack for detail, Kid Mode and Admin (family/admin accounts)
+src/navigation/TherapistNavigator.js  separate stack for therapist accounts (no consumer tabs)
 supabase/schema.sql            database tables + row-level security
 supabase/seed.sql              starter catalogue rows
 supabase/functions/create-checkout-session  Edge Function: starts a Stripe Checkout session
@@ -161,47 +166,68 @@ When you're ready to take real payments, switch your Stripe dashboard out of
 test mode, grab the **live** secret key and webhook signing secret, and repeat
 steps 6, 9 and 10 with those live values.
 
-## Admin access (manage content from inside the app)
+## Staff roles: admin and therapist
 
-Instead of the Supabase table editor + manual Storage uploads, you can add
-catalogue resources and drop private content onto a family's child right from
-the app — a hidden **Admin** row appears on your Profile once your account is
-flagged as the owner.
+Every account has a `role`: **family** (the default — a normal parent), **admin**
+(full access), or **therapist** (limited to their own assigned clients). You can
+have as many admins and therapists as you like.
 
-1. Sign up / log in in the app with the account you want to use as the owner,
-   and finish the "Tell us about your family" step (you need at least one
-   child profile on your own account too, same as any family).
+**Bootstrapping your first admin** (one-time, manual — after that, it's all in-app):
+
+1. Sign up / log in in the app with the account you want as the first admin,
+   and finish "Tell us about your family" (an admin is also a normal family
+   account underneath, so this still applies to them).
 2. In the Supabase dashboard, **SQL Editor → New query**, run (with your real
    login email):
    ```sql
-   update public.families set is_admin = true where email = 'you@example.com';
+   update public.families set role = 'admin' where email = 'you@example.com';
    ```
-3. Fully close and reopen the app (or sign out and back in) so it re-reads
-   your account. **Profile → Admin** now appears.
+3. Sign out and back in so the app re-reads your account. **Profile → Admin**
+   now appears, with three tabs:
+   - **Resources** — tap **+** to add a catalogue resource (title, category,
+     age range, price, description, tag, optional file upload), or tap an
+     existing one to edit it. Admin-only — therapists can't touch pricing or
+     the public catalogue.
+   - **Families** — every family that's finished onboarding. Tap one to see
+     what's been shared with their child, assign them to a **therapist**, and
+     add a therapist resource or success story yourself if you want to.
+   - **Team** — every signed-up account. Tap one to change its role — this is
+     how you make your **second admin**, and every therapist, from now on. No
+     more manual SQL needed after the first admin above.
 
-From there:
-- **Resources tab** — tap **+** to add a new catalogue resource (title,
-  category, age range, price, description, tag, and an optional file upload),
-  or tap any existing one to edit it.
-- **Families tab** — lists every family that's finished onboarding. Tap one to
-  see what's already been shared with their child, and add a new **therapist
-  resource** or **success story** for them, with an optional file upload for
-  resources.
+**Adding a therapist:** have them sign up in the app normally first (they'll
+land on "Tell us about your family" — that's fine, it doesn't matter for a
+therapist; they'll skip past it forever once you promote them). Then, as an
+admin, go to **Team**, tap their account, choose **Therapist**, Save. Next
+time they open the app, they land straight on **"My families"** — no
+onboarding, no shopping, no Kid Mode, just the families assigned to them (via
+Admin → Families → that family → **Change** next to Therapist) and the same
+add-resource / add-story screens the Admin section uses. A therapist can only
+ever see and add content for their own assigned children — not anyone else's —
+enforced by row-level security, not just hidden in the UI.
 
-Notes: the Admin section can add and edit, but never delete — that's on
-purpose, so a mistake can't wipe out a family's purchase history or private
-content. For the rare case you do need to delete something, use the Supabase
-table editor (as project owner, which bypasses these limits). Only one
-`is_admin = true` account exists unless you flag more — fine for a solo
-business, and there's no invite flow to grant it to someone else in-app yet.
+**What's admin-only vs therapist-allowed:**
+| | Admin | Therapist |
+|---|---|---|
+| Public catalogue (`resources`) | add/edit | — |
+| Assign a child to a therapist | yes | — |
+| Change anyone's role | yes | — |
+| See every family | yes | only their own assigned clients |
+| Add therapist resources / success stories | for any child | for their assigned children |
+
+Nothing anywhere in this system can **delete** — admins and therapists can add
+and edit, but never remove a resource, purchase, or private content item. For
+the rare case you need to delete something, use the Supabase table editor (as
+project owner, which bypasses all of this).
 
 ## Next steps (per the spec)
 
-**V1 is feature-complete against the spec, plus an in-app Admin section.**
-Auth, one child per family, the live catalogue, real purchases, private
-therapist content, file downloads, paid checkout, and owner content management
-are all wired up. To test the For [Child] screen with sample data, run
-`supabase/sample_child_content.sql` after adding your child.
+**V1 is feature-complete against the spec, plus an in-app Admin/Team/therapist
+system.** Auth, one child per family, the live catalogue, real purchases,
+private therapist content, file downloads, paid checkout, and staff content
+management (with proper admin/therapist roles) are all wired up. To test the
+For [Child] screen with sample data, run `supabase/sample_child_content.sql`
+after adding your child.
 
 From here, per spec §6 ("Not in V1 — revisit later"): therapist
 messaging/booking, subscriptions, and multiple children per family.

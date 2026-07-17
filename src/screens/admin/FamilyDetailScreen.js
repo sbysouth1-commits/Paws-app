@@ -5,20 +5,25 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Plus } from 'lucide-react-native';
 import { colors, fonts } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import { useChild } from '../../state/ChildContext';
 import ScreenHeader from '../../components/ScreenHeader';
 import PawIcon from '../../components/PawIcon';
 
 // Shows what's already been shared privately with one family's child, with
-// buttons to add a new therapist resource or success story for them.
+// buttons to add a new therapist resource or success story for them. Admins
+// also see who's assigned to this child and can change it; therapists (who
+// only ever reach their own assigned children here) just see their content.
 export default function FamilyDetailScreen({ route, navigation }) {
   const { childId, childName, parentName } = route.params;
+  const { isAdmin } = useChild();
   const [resources, setResources] = useState([]);
   const [stories, setStories] = useState([]);
+  const [therapist, setTherapist] = useState(null); // { id, label } | null
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [res, sto] = await Promise.all([
+    const [res, sto, kid] = await Promise.all([
       supabase
         .from('therapist_resources')
         .select('*')
@@ -29,9 +34,22 @@ export default function FamilyDetailScreen({ route, navigation }) {
         .select('*')
         .eq('child_id', childId)
         .order('occurred_at', { ascending: false }),
+      supabase.from('children').select('therapist_id').eq('id', childId).maybeSingle(),
     ]);
     setResources(res.data ?? []);
     setStories(sto.data ?? []);
+
+    const therapistId = kid.data?.therapist_id ?? null;
+    if (therapistId) {
+      const { data: fam } = await supabase
+        .from('families')
+        .select('parent_name, email')
+        .eq('id', therapistId)
+        .maybeSingle();
+      setTherapist({ id: therapistId, label: fam?.parent_name || fam?.email || 'Assigned' });
+    } else {
+      setTherapist(null);
+    }
     setLoading(false);
   }, [childId]);
 
@@ -45,6 +63,24 @@ export default function FamilyDetailScreen({ route, navigation }) {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScreenHeader title={childName} subtitle={`Parent: ${parentName}`} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {isAdmin ? (
+          <Pressable
+            onPress={() =>
+              navigation.navigate('AssignTherapist', {
+                childId,
+                childName,
+                currentTherapistId: therapist?.id ?? null,
+              })
+            }
+            style={({ pressed }) => [styles.therapistRow, pressed && styles.pressed]}
+          >
+            <Text style={styles.therapistLabel}>
+              Therapist: <Text style={styles.therapistValue}>{therapist?.label || 'Unassigned'}</Text>
+            </Text>
+            <Text style={styles.therapistChange}>Change</Text>
+          </Pressable>
+        ) : null}
+
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Therapist resources</Text>
           <Pressable
@@ -103,6 +139,19 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 32 },
   pressed: { opacity: 0.85 },
   loader: { marginTop: 12 },
+
+  therapistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.sageLight,
+    marginTop: 4,
+  },
+  therapistLabel: { fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft },
+  therapistValue: { fontFamily: fonts.bodySemiBold, color: colors.ink },
+  therapistChange: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.clay },
 
   sectionRow: {
     flexDirection: 'row',

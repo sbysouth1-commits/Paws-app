@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/public-sans';
 import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
 import RootNavigator from './src/navigation/RootNavigator';
+import TherapistNavigator from './src/navigation/TherapistNavigator';
 import AuthScreen from './src/screens/AuthScreen';
 import AddChildScreen from './src/screens/AddChildScreen';
 import { CartProvider } from './src/state/CartContext';
@@ -27,11 +28,23 @@ function Loading() {
   );
 }
 
-// Once logged in (or in mock mode), require a child profile before the app.
+// Once logged in (or in mock mode), route to the right shell: therapists are
+// pure staff accounts with no family/child of their own, so they skip
+// onboarding entirely and land straight in their own navigator; everyone
+// else needs a child profile before the consumer app.
 function ChildGate() {
-  const { loading, needsOnboarding } = useChild();
+  const { loading, needsOnboarding, isTherapist } = useChild();
 
   if (loading) return <Loading />;
+
+  if (isTherapist) {
+    return (
+      <ResourcesProvider>
+        <TherapistNavigator />
+      </ResourcesProvider>
+    );
+  }
+
   if (needsOnboarding) return <AddChildScreen />;
 
   return (
