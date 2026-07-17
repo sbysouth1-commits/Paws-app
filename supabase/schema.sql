@@ -163,12 +163,19 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- Role checks for the signed-in user. Each only ever reads the caller's own
--- row (always allowed by families_select_own below), so these stay safe under
--- RLS without needing elevated (security definer) privileges.
+-- row (id = auth.uid()), so there's no privilege-escalation risk — but they
+-- MUST be security definer (bypassing RLS internally): these functions are
+-- themselves used inside families'/children's own RLS policies, so a
+-- non-definer version would have its internal query re-evaluate those same
+-- policies, which call these functions again — Postgres chases that cycle
+-- until it hits "stack depth limit exceeded". security definer breaks the
+-- loop by reading the row directly, with no policy evaluation in between.
 create or replace function public.is_admin()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (select 1 from public.families where id = auth.uid() and role = 'admin');
 $$;
@@ -177,6 +184,8 @@ create or replace function public.is_therapist()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (select 1 from public.families where id = auth.uid() and role = 'therapist');
 $$;
@@ -187,6 +196,8 @@ create or replace function public.is_staff()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (select 1 from public.families where id = auth.uid() and role in ('admin', 'therapist'));
 $$;
