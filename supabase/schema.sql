@@ -6,19 +6,27 @@
 -- therapist_resources, success_stories, purchases) are locked down with RLS so
 -- a family can only ever read its own rows. The public `resources` catalogue is
 -- readable by any signed-in user.
+--
+-- Admin access: after running this file, make your own account the business
+-- owner by running (in a new query, once you've signed up in the app):
+--   update public.families set is_admin = true where email = 'you@example.com';
+-- That unlocks the Admin tab in the app for that account only.
 
 -- ---------------------------------------------------------------------------
 -- Tables
 -- ---------------------------------------------------------------------------
 
 -- One row per parent account. id matches the Supabase auth user id.
+-- is_admin marks the business owner's own account — see "Admin access" below.
 create table if not exists public.families (
   id          uuid primary key references auth.users (id) on delete cascade,
   email       text,
   parent_name text,
+  is_admin    boolean not null default false,
   created_at  timestamptz not null default now()
 );
 alter table public.families add column if not exists parent_name text;
+alter table public.families add column if not exists is_admin boolean not null default false;
 
 -- One child per family in V1 (schema already allows more).
 create table if not exists public.children (
@@ -99,6 +107,19 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Returns true if the signed-in user's own families row is flagged as admin.
+-- Only ever reads the caller's own row, so this stays safe under RLS without
+-- needing elevated (security definer) privileges.
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1 from public.families where id = auth.uid() and is_admin = true
+  );
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Row-level security
 -- ---------------------------------------------------------------------------
@@ -109,18 +130,26 @@ alter table public.purchases           enable row level security;
 alter table public.therapist_resources enable row level security;
 alter table public.success_stories     enable row level security;
 
--- families: a user sees and edits only their own row.
+-- families: a user sees and edits only their own row; the admin sees every
+-- family (needed to pick a family/child in the in-app Admin section).
 drop policy if exists "families_select_own" on public.families;
 create policy "families_select_own" on public.families
   for select using (id = auth.uid());
+drop policy if exists "families_select_admin" on public.families;
+create policy "families_select_admin" on public.families
+  for select using (public.is_admin());
 drop policy if exists "families_update_own" on public.families;
 create policy "families_update_own" on public.families
   for update using (id = auth.uid());
 
--- children: scoped to the owning family (family id == auth user id).
+-- children: scoped to the owning family (family id == auth user id); the
+-- admin can also see every child, for the same reason as above.
 drop policy if exists "children_select_own" on public.children;
 create policy "children_select_own" on public.children
   for select using (family_id = auth.uid());
+drop policy if exists "children_select_admin" on public.children;
+create policy "children_select_admin" on public.children
+  for select using (public.is_admin());
 drop policy if exists "children_insert_own" on public.children;
 create policy "children_insert_own" on public.children
   for insert with check (family_id = auth.uid());
@@ -131,10 +160,17 @@ drop policy if exists "children_delete_own" on public.children;
 create policy "children_delete_own" on public.children
   for delete using (family_id = auth.uid());
 
--- resources: public catalogue — any signed-in user can read.
+-- resources: public catalogue — any signed-in user can read; only the admin
+-- can add or edit resources (families never write to this table).
 drop policy if exists "resources_select_all" on public.resources;
 create policy "resources_select_all" on public.resources
   for select using (auth.role() = 'authenticated');
+drop policy if exists "resources_insert_admin" on public.resources;
+create policy "resources_insert_admin" on public.resources
+  for insert with check (public.is_admin());
+drop policy if exists "resources_update_admin" on public.resources;
+create policy "resources_update_admin" on public.resources
+  for update using (public.is_admin());
 
 -- purchases: a family reads only its own. No insert policy — the app has no
 -- way to write a purchase row; only the stripe-webhook Edge Function can
@@ -145,23 +181,47 @@ create policy "purchases_select_own" on public.purchases
   for select using (family_id = auth.uid());
 drop policy if exists "purchases_insert_own" on public.purchases;
 
--- therapist_resources: readable only for the family's own children.
+-- therapist_resources: readable only for the family's own children. The admin
+-- can read every child's, and is the only one who can add or edit them —
+-- previously this required the Supabase table editor; now the in-app Admin
+-- section can do it directly.
 drop policy if exists "therapist_resources_select_own" on public.therapist_resources;
 create policy "therapist_resources_select_own" on public.therapist_resources
   for select using (
     child_id in (select id from public.children where family_id = auth.uid())
   );
+drop policy if exists "therapist_resources_select_admin" on public.therapist_resources;
+create policy "therapist_resources_select_admin" on public.therapist_resources
+  for select using (public.is_admin());
+drop policy if exists "therapist_resources_insert_admin" on public.therapist_resources;
+create policy "therapist_resources_insert_admin" on public.therapist_resources
+  for insert with check (public.is_admin());
+drop policy if exists "therapist_resources_update_admin" on public.therapist_resources;
+create policy "therapist_resources_update_admin" on public.therapist_resources
+  for update using (public.is_admin());
 
--- success_stories: readable only for the family's own children.
+-- success_stories: readable only for the family's own children; same admin
+-- read/write access as therapist_resources above.
 drop policy if exists "success_stories_select_own" on public.success_stories;
 create policy "success_stories_select_own" on public.success_stories
   for select using (
     child_id in (select id from public.children where family_id = auth.uid())
   );
+drop policy if exists "success_stories_select_admin" on public.success_stories;
+create policy "success_stories_select_admin" on public.success_stories
+  for select using (public.is_admin());
+drop policy if exists "success_stories_insert_admin" on public.success_stories;
+create policy "success_stories_insert_admin" on public.success_stories
+  for insert with check (public.is_admin());
+drop policy if exists "success_stories_update_admin" on public.success_stories;
+create policy "success_stories_update_admin" on public.success_stories
+  for update using (public.is_admin());
 
--- Note: therapist_resources and success_stories are written by you (the
--- business owner) via the Supabase table editor, so they intentionally have no
--- family-facing insert/update policies — families get read-only access.
+-- Note: no delete policies anywhere in this file, on purpose — the Admin
+-- section can add and edit but never delete, so a mistake can't destroy a
+-- family's purchase history or private content. Use the Supabase table editor
+-- (as the project owner, which bypasses RLS) for the rare case you need to
+-- remove something.
 
 -- ---------------------------------------------------------------------------
 -- File storage
@@ -208,3 +268,14 @@ create policy "therapist_files_select_if_own_child" on storage.objects
         and tr.file_url = storage.objects.name
     )
   );
+
+-- Uploads: only the admin can add files to either bucket — the Admin section
+-- uploads a PDF straight from the app when you add or edit a resource / a
+-- therapist drop, instead of using the dashboard's Storage uploader.
+drop policy if exists "resource_files_insert_admin" on storage.objects;
+create policy "resource_files_insert_admin" on storage.objects
+  for insert with check (bucket_id = 'resource-files' and public.is_admin());
+
+drop policy if exists "therapist_files_insert_admin" on storage.objects;
+create policy "therapist_files_insert_admin" on storage.objects
+  for insert with check (bucket_id = 'therapist-files' and public.is_admin());

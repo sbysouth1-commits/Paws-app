@@ -2,10 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, fonts } from '../theme/colors';
 
-export default function ScreenHeader({ title, right }) {
+export default function ScreenHeader({ title, subtitle, right }) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
+      <View style={styles.textCol}>
+        <Text style={styles.title}>{title}</Text>
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      </View>
       {right}
     </View>
   );
@@ -21,5 +24,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 12,
   },
+  textCol: { flex: 1, gap: 2 },
   title: { fontFamily: fonts.heading, fontSize: 22, color: colors.ink },
+  subtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.inkSoft },
 });

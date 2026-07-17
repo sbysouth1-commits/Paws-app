@@ -22,6 +22,7 @@ export function ChildProvider({ children }) {
   const { user } = useAuth();
   const [child, setChild] = useState(isSupabaseConfigured ? null : mockChild);
   const [parentName, setParentName] = useState(isSupabaseConfigured ? null : family.parentName);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export function ChildProvider({ children }) {
     let active = true;
     setLoading(true);
     Promise.all([
-      supabase.from('families').select('parent_name').eq('id', user.id).maybeSingle(),
+      supabase.from('families').select('parent_name, is_admin').eq('id', user.id).maybeSingle(),
       supabase
         .from('children')
         .select('*')
@@ -39,6 +40,7 @@ export function ChildProvider({ children }) {
     ]).then(([fam, kids]) => {
       if (!active) return;
       setParentName(fam.data?.parent_name ?? null);
+      setIsAdmin(Boolean(fam.data?.is_admin));
       setChild(kids.data && kids.data[0] ? childFromRow(kids.data[0]) : null);
       setLoading(false);
     });
@@ -56,6 +58,7 @@ export function ChildProvider({ children }) {
       // Therapist name isn't stored on the child; screens that show private
       // content derive it from that content. Null here means "unknown yet".
       therapistName: isSupabaseConfigured ? null : family.therapistName,
+      isAdmin,
       loading,
       // Onboard until we have both a parent name and a child.
       needsOnboarding: isSupabaseConfigured && !loading && (!child || !parentName),
@@ -94,7 +97,7 @@ export function ChildProvider({ children }) {
         return {};
       },
     }),
-    [child, parentName, loading, user]
+    [child, parentName, isAdmin, loading, user]
   );
 
   return <ChildContext.Provider value={value}>{children}</ChildContext.Provider>;

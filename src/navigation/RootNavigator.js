@@ -14,6 +14,11 @@ import CartScreen from '../screens/CartScreen';
 import ForChildScreen from '../screens/ForChildScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import KidModeScreen from '../screens/KidModeScreen';
+import AdminScreen from '../screens/admin/AdminScreen';
+import ResourceFormScreen from '../screens/admin/ResourceFormScreen';
+import FamilyDetailScreen from '../screens/admin/FamilyDetailScreen';
+import TherapistResourceFormScreen from '../screens/admin/TherapistResourceFormScreen';
+import SuccessStoryFormScreen from '../screens/admin/SuccessStoryFormScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -104,6 +109,23 @@ export default function RootNavigator() {
         {/* Kid Mode has its own in-screen lock button to exit, so no stack header. */}
         <Stack.Screen name="KidMode" component={KidModeScreen} options={{ headerShown: false }} />
         {/* gestureEnabled stays default; the lock button is the intended way out. */}
+
+        {/* Admin — reachable only from Profile, and only when isAdmin is true.
+            title: '' keeps the native back chevron while each screen shows
+            its own ScreenHeader for the real title, matching ResourceDetail. */}
+        <Stack.Screen name="Admin" component={AdminScreen} options={{ title: '' }} />
+        <Stack.Screen name="ResourceForm" component={ResourceFormScreen} options={{ title: '' }} />
+        <Stack.Screen name="FamilyDetail" component={FamilyDetailScreen} options={{ title: '' }} />
+        <Stack.Screen
+          name="TherapistResourceForm"
+          component={TherapistResourceFormScreen}
+          options={{ title: '' }}
+        />
+        <Stack.Screen
+          name="SuccessStoryForm"
+          component={SuccessStoryFormScreen}
+          options={{ title: '' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

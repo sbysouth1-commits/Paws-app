@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronRight, Download, Globe, LogOut } from 'lucide-react-native';
+import { ChevronRight, Download, Globe, LogOut, Wrench } from 'lucide-react-native';
 import { colors, fonts } from '../theme/colors';
 import { useCart } from '../state/CartContext';
 import { useAuth } from '../state/AuthContext';
@@ -15,7 +15,7 @@ const WEBSITE = 'https://pawsitivekids.com.au';
 export default function ProfileScreen({ navigation }) {
   const { purchases } = useCart();
   const { supabaseEnabled, user, signOut } = useAuth();
-  const { childName, childAge, parentName } = useChild();
+  const { childName, childAge, parentName, isAdmin } = useChild();
   const avatarInitial = (parentName || 'P').charAt(0).toUpperCase();
   const childSummary = childAge ? `${childName} (${childAge} yrs)` : childName;
 
@@ -68,6 +68,20 @@ export default function ProfileScreen({ navigation }) {
             </Pressable>
           ))}
         </View>
+
+        {/* Admin — only visible to the business owner's own account */}
+        {isAdmin ? (
+          <Pressable
+            onPress={() => navigation.navigate('Admin')}
+            style={({ pressed }) => [styles.settingRow, styles.adminRow, pressed && styles.pressed]}
+          >
+            <View style={styles.websiteLeft}>
+              <Wrench size={16} color={colors.ink} />
+              <Text style={styles.settingLabel}>Admin</Text>
+            </View>
+            <ChevronRight size={16} color={colors.inkSoft} />
+          </Pressable>
+        ) : null}
 
         {/* Website link */}
         <Pressable
@@ -157,6 +171,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   settingLabel: { fontFamily: fonts.body, fontSize: 14, color: colors.ink },
+  adminRow: { backgroundColor: colors.sageLight, borderColor: colors.sageLight },
   websiteLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   websiteLabel: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.clay },
 
