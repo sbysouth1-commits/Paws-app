@@ -241,7 +241,10 @@ insert into storage.buckets (id, name, public)
 values ('therapist-files', 'therapist-files', false)
 on conflict (id) do nothing;
 
-alter table storage.objects enable row level security;
+-- storage.objects already has row-level security enabled by Supabase itself
+-- (only Supabase can toggle that flag — a project owner's SQL editor role
+-- can't, even though it can still create/drop policies on it, which is all
+-- we need below).
 
 drop policy if exists "resource_files_select_if_purchased" on storage.objects;
 create policy "resource_files_select_if_purchased" on storage.objects
