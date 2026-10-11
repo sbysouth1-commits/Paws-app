@@ -9,7 +9,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { openStorageFile } from '../lib/fileAccess';
 import { useMedications } from '../lib/useMedications';
 import { getMedicationStatus, formatTime } from '../lib/medicationStatus';
-import { resyncMedicationNotifications } from '../lib/medicationNotifications';
+import { registerPushToken } from '../lib/pushTokens';
+import { useAuth } from '../state/AuthContext';
 import { useChild } from '../state/ChildContext';
 import ScreenHeader from '../components/ScreenHeader';
 import PawIcon from '../components/PawIcon';
@@ -149,6 +150,7 @@ function MedicationCard({ medication, onPress, onLogDose, logging }) {
 
 export default function ForChildScreen({ navigation }) {
   const { child, childName } = useChild();
+  const { user } = useAuth();
   const [tab, setTab] = useState('resources');
   const [resources, setResources] = useState(isSupabaseConfigured ? [] : THERAPIST_RESOURCES);
   const [stories, setStories] = useState(isSupabaseConfigured ? [] : SUCCESS_STORIES);
@@ -162,12 +164,14 @@ export default function ForChildScreen({ navigation }) {
     }, [reloadMedications])
   );
 
-  // Keep the device's scheduled reminders in sync whenever the medications
-  // list changes (added, edited, deactivated, or a log shifts "done today").
+  // Register this device for medication reminder push notifications — sent
+  // server-side by the cron job in schema.sql, so every device a family has
+  // registered gets the same reminder, and it's skipped once anyone logs the
+  // dose (see "Medications and reminders" in the README).
   useEffect(() => {
-    if (medications.length === 0) return;
-    resyncMedicationNotifications(childName, medications);
-  }, [medications, childName]);
+    if (!user?.id) return;
+    registerPushToken(user.id);
+  }, [user?.id]);
 
   const handleLogDose = async (medication) => {
     setLoggingId(medication.id);

@@ -510,3 +510,123 @@ create policy "resource_files_insert_admin" on storage.objects
 drop policy if exists "therapist_files_insert_admin" on storage.objects;
 create policy "therapist_files_insert_admin" on storage.objects
   for insert with check (bucket_id = 'therapist-files' and public.is_staff());
+
+-- ---------------------------------------------------------------------------
+-- Medication reminder push notifications
+-- ---------------------------------------------------------------------------
+-- A server-sent reminder beats a per-device local alarm: one shared check of
+-- what's actually due, sent to every device a family has registered, and
+-- automatically skipped once someone logs the dose — instead of each phone
+-- independently firing its own alarm with no idea whether the other parent
+-- already handled it.
+--
+-- NOTE — times are matched against Australia/Sydney local time (see `tz`
+-- below). If this app ever supports families outside that timezone, this
+-- needs a per-family timezone column instead of the hardcoded constant.
+
+-- One row per device that should receive reminders for its family.
+create table if not exists public.push_tokens (
+  id         uuid primary key default gen_random_uuid(),
+  family_id  uuid not null references public.families (id) on delete cascade,
+  token      text not null unique,
+  platform   text,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_tokens_family_id_idx on public.push_tokens (family_id);
+
+alter table public.push_tokens enable row level security;
+
+drop policy if exists "push_tokens_select_own" on public.push_tokens;
+create policy "push_tokens_select_own" on public.push_tokens
+  for select using (family_id = auth.uid());
+drop policy if exists "push_tokens_insert_own" on public.push_tokens;
+create policy "push_tokens_insert_own" on public.push_tokens
+  for insert with check (family_id = auth.uid());
+drop policy if exists "push_tokens_update_own" on public.push_tokens;
+create policy "push_tokens_update_own" on public.push_tokens
+  for update using (family_id = auth.uid());
+drop policy if exists "push_tokens_delete_own" on public.push_tokens;
+create policy "push_tokens_delete_own" on public.push_tokens
+  for delete using (family_id = auth.uid());
+
+-- pg_net lets Postgres itself make an HTTP request — used below to call
+-- Expo's push API directly from the cron job, with no separate server to
+-- deploy or secret to manage (Expo's push endpoint needs no API key).
+create extension if not exists pg_net with schema extensions;
+
+-- Finds every medication due at the current minute (Australia/Sydney time)
+-- that hasn't already been given today, and pushes a reminder to every
+-- device the family has registered. security definer so it can see every
+-- family's data regardless of who/what invokes it (the cron job below).
+create or replace function public.send_due_medication_reminders()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  tz constant text := 'Australia/Sydney';
+  now_local timestamp := now() at time zone tz;
+  now_hhmm text := to_char(now_local, 'HH24:MI');
+  med record;
+  slot_index int;
+  given_count int;
+  tokens text[];
+begin
+  for med in
+    select m.id, m.name, m.dosage, m.times, c.name as child_name, c.family_id
+    from public.medications m
+    join public.children c on c.id = m.child_id
+    where m.active and now_hhmm = any (m.times)
+  loop
+    -- How many of this medication's daily times fall before the one that
+    -- just matched, and how many doses were already given today — if
+    -- given_count is already past this slot's position, skip it. Mirrors
+    -- the "doses given in order" assumption the app's own status badge uses.
+    select count(*) into slot_index from unnest(med.times) t where t < now_hhmm;
+
+    select count(*) into given_count
+    from public.medication_logs
+    where medication_id = med.id
+      and status = 'given'
+      and (taken_at at time zone tz)::date = now_local::date;
+
+    if given_count > slot_index then
+      continue;
+    end if;
+
+    select array_agg(token) into tokens from public.push_tokens where family_id = med.family_id;
+    if tokens is null or array_length(tokens, 1) = 0 then
+      continue;
+    end if;
+
+    perform net.http_post(
+      url := 'https://exp.host/--/api/v2/push/send',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'Accept', 'application/json'),
+      body := jsonb_build_object(
+        'to', tokens,
+        'title', med.child_name || E'''s medication',
+        'body', 'Time for ' || med.name || case when med.dosage is not null then ' (' || med.dosage || ')' else '' end,
+        'sound', 'default',
+        'data', jsonb_build_object('type', 'medication-reminder', 'medicationId', med.id)
+      )
+    );
+  end loop;
+end;
+$$;
+
+-- Runs every minute. cron.schedule errors if a job with this name already
+-- exists, so unschedule first (ignoring "doesn't exist yet" on a fresh
+-- database) to keep this file safe to re-run.
+do $$
+begin
+  perform cron.unschedule('send-medication-reminders');
+exception when others then
+  null;
+end $$;
+
+select cron.schedule(
+  'send-medication-reminders',
+  '* * * * *',
+  $$ select public.send_due_medication_reminders(); $$
+);

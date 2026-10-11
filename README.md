@@ -22,7 +22,7 @@ Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, 
 - **Kid Mode** — simplified big-button grid of the child's unlocked activities, lock button to hand control back, and a full-screen activity preview. No purchasing or external links, per the spec
 - **Admin** (`role = 'admin'`) — a hidden "Admin" row on Profile with three tabs: catalogue resources (add/edit, with a file picker), every family (assign a therapist, add content), and Team (change anyone's role — this is how you make more admins and therapists, no more manual SQL after the first one)
 - **Therapist** (`role = 'therapist'`) — a separate pure-staff app shell (no shopping, no onboarding): sign out, and a list of just their own assigned families, using the same content screens as Admin. Row-level security keeps them scoped to their own clients only
-- **Medications** — a third tab on For [Child]: add any number of medications per child with dosage, instructions and one or more daily dose times; log each dose as given or skipped with full history; a status badge (overdue / next up / done today) and one-tap "Log dose" on each card. Scheduled device notifications fire at each dose time even with the app closed — see "Medication reminders" below, since this is the one feature that needs a real build rather than Expo Go
+- **Medications** — a third tab on For [Child]: add any number of medications per child with dosage, instructions and one or more daily dose times; log each dose as given or skipped with full history; a status badge (overdue / next up / done today) and one-tap "Log dose" on each card. A server-side cron job pushes a reminder to every device a family has registered when a dose is due and not yet logged — see "Medications and reminders" below, since this is the one feature that needs a real build rather than Expo Go
 
 ## Structure
 
@@ -36,7 +36,8 @@ src/lib/fileUpload.js          staff: pick + upload a file to a Storage bucket
 src/lib/useFamiliesList.js     shared families+child loader (RLS-scoped per role)
 src/lib/useMedications.js      a child's medications + today's dose logs
 src/lib/medicationStatus.js    "overdue / next up / done today" + time formatting
-src/lib/medicationNotifications.js  permission + daily-repeating local notification scheduling
+src/lib/medicationNotifications.js  notification permission helper
+src/lib/pushTokens.js          registers this device for medication reminder pushes
 src/state/AuthContext.js       Supabase session/login state
 src/state/ChildContext.js      parent name + child profile + role/isAdmin/isTherapist (Supabase, or mock)
 src/state/ResourcesContext.js  catalogue loader (Supabase, or mock fallback)
@@ -234,44 +235,73 @@ each dose as given or skipped, and see a status badge (overdue / next up /
 done today) at a glance. This is strictly private to the family — not visible
 to admins or therapists, same as the child's own profile.
 
-**Reminders need a real build, not Expo Go.** Everything above (adding
-medications, logging doses, seeing status) works immediately in Expo Go, same
-as the rest of the app — but the actual reminder *alerts*, which need to fire
-even when the app is closed, use the phone's own notification scheduler
-(`expo-notifications`), and recent Expo Go versions no longer support that.
-You'll need a one-time **development build** instead — a real version of the
-app with your own icon that you install once, after which you keep using
-`npx expo start` and your usual workflow exactly as before (just opening that
-app instead of Expo Go to test).
+**Reminders are sent from the server, to every device a family has
+registered** — not a per-device alarm. A Supabase cron job checks once a
+minute for anything due that hasn't already been logged today, and pushes to
+every phone registered for that family via Expo's push service. This is
+deliberate: if two parents each have the app, both get reminded from the same
+check, and once *either* of them logs the dose, the next minute's check sees
+that and skips sending anything further for that slot — instead of each
+phone independently firing its own alarm with no idea the other one already
+handled it.
 
-1. Re-run `supabase/schema.sql` as usual (adds the `medications` and
-   `medication_logs` tables).
-2. On your PC: `git pull`, then `npm install` (two new packages this time:
-   `expo-notifications` and a native time picker).
-3. Install the EAS CLI the same way Stripe setup did: prefix commands with
-   `npx eas-cli@latest` instead of `eas` (or install it permanently with
-   `npm install -g eas-cli`).
-4. Build a development client for your phone's platform:
+**This still needs a real build, not Expo Go** — adding medications and
+logging doses works immediately in Expo Go, same as the rest of the app, but
+receiving a push notification needs a real notification/push setup Expo Go
+doesn't provide. You'll need a one-time **development build** instead — a
+real version of the app with your own icon that you install once, after
+which you keep using `npx expo start` and your usual workflow exactly as
+before.
+
+1. Re-run `supabase/schema.sql` as usual. This adds the `medications`,
+   `medication_logs` and `push_tokens` tables, turns on the `pg_net`
+   extension (lets the database itself call Expo's push API), and schedules
+   a `send-medication-reminders` cron job that runs every minute.
+2. On your PC: `git pull`, then `npm install` (new packages this time:
+   `expo-notifications`, a native time picker, and `expo-device`).
+3. If you already ran `eas build` for the first time before this — **check
+   whether `app.json` changed on your PC and wasn't committed yet**: EAS
+   writes a project id (and sometimes a package name) into it the first time
+   you build. Run `git status`; if `app.json` shows as modified, commit and
+   push it now (`git add app.json`, then a commit and push) so that id is
+   saved for good — otherwise a future `git pull` could ask you to discard
+   it, same as the `package-lock.json` prompts you've seen before, and this
+   one you don't want to discard.
+4. Build (or rebuild) your development client:
    ```
    npx eas-cli@latest build --profile development --platform android
    ```
-   (use `--platform ios` for iPhone). The first time, it'll prompt you to log
-   in (same account as before) and to create/link an EAS project for this
-   app — just accept the defaults. The build runs in the cloud and takes a
-   few minutes; when it's done you'll get a link/QR code to install it
-   directly on your phone (Android: installs like any app; iPhone: needs your
-   phone registered first, which the CLI walks you through).
-5. From now on: `npx expo start` as always, but open the **Pawsitive Kids**
-   dev client app you just installed (not Expo Go) to scan the QR code —
-   everything else about your workflow stays the same.
-6. Open the Medications tab and add a medication with a dose time a couple of
-   minutes from now — you'll get an iOS/Android permission prompt the first
-   time, then the reminder should pop up right on schedule, even if you close
-   the app.
+   (`--platform ios` for iPhone.) Same as before — install the result on your
+   phone when it finishes.
+5. **Android only — one extra one-time step**, because Google requires every
+   app to have its own push credentials now (Expo can no longer provide a
+   shared one): you'll need a free Firebase project.
+   1. Go to [console.firebase.google.com](https://console.firebase.google.com),
+      create a project (any name), then **Add app → Android**, using the
+      package name from your `app.json` (`expo.android.package` — EAS will
+      have filled this in during step 4 above if it wasn't already set).
+   2. In that Firebase project: **Project settings → Service accounts →
+      Generate new private key** — downloads a `.json` file. Keep it safe;
+      don't commit it to git.
+   3. Back in your terminal: `npx eas-cli@latest credentials`, choose
+      **Android**, then **Push Notifications: Manage FCM V1 Service Account
+      Key**, and upload that downloaded file when asked.
+   4. (iPhone doesn't need this step — EAS manages Apple's push credentials
+      for you automatically, though a real device still needs your Apple
+      Developer account to be set up for code signing, same as any iOS build.)
+6. From now on: `npx expo start` as always, but open the dev client app you
+   installed (not Expo Go) to scan the QR code.
+7. Open the Medications tab once on each parent's phone — this silently
+   registers that device for reminders (you'll see an iOS/Android permission
+   prompt the first time). Then add a medication with a dose time a minute or
+   two away and wait — the reminder should land on every registered phone at
+   once, even with the app fully closed.
 
 You only need to repeat the `eas build` step if a future feature needs a
 *different* native module — everyday development keeps using `npx expo
-start` exactly as before.
+start` exactly as before. The Firebase/FCM step in 5 is also one-time, not
+per-build.
+
 
 ## Next steps (per the spec)
 
