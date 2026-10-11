@@ -5,6 +5,12 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 // "mock mode": no login is required and the screens use local mock data.
 const AuthContext = createContext(null);
 
+// Where Supabase sends the password-reset email link — a standalone web page
+// (not the app itself), so resetting a password needs no native rebuild.
+// This URL must also be added to Supabase dashboard → Authentication → URL
+// Configuration → Redirect URLs, or Supabase will silently ignore it.
+const RESET_PASSWORD_URL = 'https://claude.ai/artifact/TJXBvX1V3tsDHoGkbYqfV1';
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
@@ -36,6 +42,8 @@ export function AuthProvider({ children }) {
       signIn: (email, password) =>
         supabase.auth.signInWithPassword({ email: email.trim(), password }),
       signOut: () => supabase.auth.signOut(),
+      resetPasswordForEmail: (email) =>
+        supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: RESET_PASSWORD_URL }),
     }),
     [session, loading]
   );

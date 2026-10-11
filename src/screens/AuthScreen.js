@@ -16,7 +16,7 @@ import { useAuth } from '../state/AuthContext';
 import PawIcon from '../components/PawIcon';
 
 export default function AuthScreen() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPasswordForEmail } = useAuth();
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,6 +49,24 @@ export default function AuthScreen() {
     }
     // On success with a session, AuthContext's listener swaps to the app.
   };
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    setNotice(null);
+    if (!email.trim()) {
+      setError('Enter your email above first, then tap "Forgot password?" again.');
+      return;
+    }
+    setBusy(true);
+    const { error: resetError } = await resetPasswordForEmail(email);
+    setBusy(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setNotice("If that email has an account, we've sent a password reset link.");
+  };
+
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -91,6 +109,12 @@ export default function AuthScreen() {
               secureTextEntry
               textContentType={isSignup ? 'newPassword' : 'password'}
             />
+
+            {!isSignup ? (
+              <Pressable onPress={handleForgotPassword} disabled={busy} style={styles.forgotRow}>
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </Pressable>
+            ) : null}
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -160,6 +184,9 @@ const styles = StyleSheet.create({
   },
   error: { marginTop: 12, fontFamily: fonts.bodyMedium, fontSize: 13, color: '#B3261E' },
   notice: { marginTop: 12, fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.green },
+
+  forgotRow: { marginTop: 10, alignSelf: 'flex-end' },
+  forgotText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.ink },
 
   button: {
     marginTop: 20,

@@ -79,6 +79,14 @@ the `resources` catalogue live from Supabase** — edit a row in the Table edito
 shows up in the app on next launch. You (the business owner) add therapist resources and
 success stories directly via the Supabase **Table editor** too.
 
+**"Forgot password?"** sends a reset link to a small standalone web page (not a deep link
+back into the app, so no native rebuild is needed for this) — a published Claude Artifact
+at `https://claude.ai/artifact/TJXBvX1V3tsDHoGkbYqfV1`, with the redirect URL hardcoded
+into `src/state/AuthContext.js`. For it to actually work, that exact URL must be added to
+your Supabase dashboard: **Authentication → URL Configuration → Redirect URLs** → add it →
+Save. Without this step Supabase silently ignores the custom redirect and the link in the
+email won't go anywhere useful.
+
 ## Uploading a resource file (so "Open resource" has something to open)
 
 `schema.sql` creates two **private** Storage buckets: `resource-files` (the paid
