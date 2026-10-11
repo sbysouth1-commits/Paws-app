@@ -93,6 +93,36 @@ create table if not exists public.children (
 alter table public.children add column if not exists therapist_id uuid references public.families (id);
 create index if not exists children_therapist_id_idx on public.children (therapist_id);
 
+-- A medication the family tracks for their child. Strictly family-private —
+-- no admin or therapist access, same as children itself: this is the
+-- family's own health record-keeping, not shared business content.
+-- times is a list of "HH:MM" (24h) daily dose times, e.g. {'08:00','20:00'}.
+create table if not exists public.medications (
+  id           uuid primary key default gen_random_uuid(),
+  child_id     uuid not null references public.children (id) on delete cascade,
+  name         text not null,
+  dosage       text,
+  instructions text,
+  times        text[] not null default '{}',
+  active       boolean not null default true,
+  created_at   timestamptz not null default now()
+);
+create index if not exists medications_child_id_idx on public.medications (child_id);
+
+-- One logged dose (given or skipped) for a medication.
+create table if not exists public.medication_logs (
+  id            uuid primary key default gen_random_uuid(),
+  medication_id uuid not null references public.medications (id) on delete cascade,
+  status        text not null default 'given',
+  taken_at      timestamptz not null default now(),
+  note          text,
+  created_at    timestamptz not null default now()
+);
+alter table public.medication_logs drop constraint if exists medication_logs_status_check;
+alter table public.medication_logs add constraint medication_logs_status_check
+  check (status in ('given', 'skipped'));
+create index if not exists medication_logs_medication_id_idx on public.medication_logs (medication_id);
+
 -- Public catalogue of resources for sale.
 create table if not exists public.resources (
   id          uuid primary key default gen_random_uuid(),
@@ -357,11 +387,68 @@ create policy "success_stories_update_therapist" on public.success_stories
     and child_id in (select id from public.children where therapist_id = auth.uid())
   );
 
--- Note: no delete policies anywhere in this file, on purpose — the Admin
+-- Note: no delete policies on the tables above, on purpose — the Admin
 -- section can add and edit but never delete, so a mistake can't destroy a
 -- family's purchase history or private content. Use the Supabase table editor
 -- (as the project owner, which bypasses RLS) for the rare case you need to
 -- remove something.
+
+alter table public.medications     enable row level security;
+alter table public.medication_logs enable row level security;
+
+-- medications: fully owned by the family — unlike the admin-content tables
+-- above, delete IS allowed here, since this is the family's own data (same
+-- as children itself, which already allows delete).
+drop policy if exists "medications_select_own" on public.medications;
+create policy "medications_select_own" on public.medications
+  for select using (
+    child_id in (select id from public.children where family_id = auth.uid())
+  );
+drop policy if exists "medications_insert_own" on public.medications;
+create policy "medications_insert_own" on public.medications
+  for insert with check (
+    child_id in (select id from public.children where family_id = auth.uid())
+  );
+drop policy if exists "medications_update_own" on public.medications;
+create policy "medications_update_own" on public.medications
+  for update using (
+    child_id in (select id from public.children where family_id = auth.uid())
+  );
+drop policy if exists "medications_delete_own" on public.medications;
+create policy "medications_delete_own" on public.medications
+  for delete using (
+    child_id in (select id from public.children where family_id = auth.uid())
+  );
+
+-- medication_logs: same ownership check, one join further through
+-- medications -> children -> family_id.
+drop policy if exists "medication_logs_select_own" on public.medication_logs;
+create policy "medication_logs_select_own" on public.medication_logs
+  for select using (
+    medication_id in (
+      select m.id from public.medications m
+      join public.children c on c.id = m.child_id
+      where c.family_id = auth.uid()
+    )
+  );
+drop policy if exists "medication_logs_insert_own" on public.medication_logs;
+create policy "medication_logs_insert_own" on public.medication_logs
+  for insert with check (
+    medication_id in (
+      select m.id from public.medications m
+      join public.children c on c.id = m.child_id
+      where c.family_id = auth.uid()
+    )
+  );
+drop policy if exists "medication_logs_delete_own" on public.medication_logs;
+create policy "medication_logs_delete_own" on public.medication_logs
+  for delete using (
+    medication_id in (
+      select m.id from public.medications m
+      join public.children c on c.id = m.child_id
+      where c.family_id = auth.uid()
+    )
+  );
 
 -- ---------------------------------------------------------------------------
 -- File storage

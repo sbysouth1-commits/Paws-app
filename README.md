@@ -22,28 +22,34 @@ Design matches `app_prototype3.jsx` (tokens, category set, lucide stroke icons, 
 - **Kid Mode** — simplified big-button grid of the child's unlocked activities, lock button to hand control back, and a full-screen activity preview. No purchasing or external links, per the spec
 - **Admin** (`role = 'admin'`) — a hidden "Admin" row on Profile with three tabs: catalogue resources (add/edit, with a file picker), every family (assign a therapist, add content), and Team (change anyone's role — this is how you make more admins and therapists, no more manual SQL after the first one)
 - **Therapist** (`role = 'therapist'`) — a separate pure-staff app shell (no shopping, no onboarding): sign out, and a list of just their own assigned families, using the same content screens as Admin. Row-level security keeps them scoped to their own clients only
+- **Medications** — a third tab on For [Child]: add any number of medications per child with dosage, instructions and one or more daily dose times; log each dose as given or skipped with full history; a status badge (overdue / next up / done today) and one-tap "Log dose" on each card. Scheduled device notifications fire at each dose time even with the app closed — see "Medication reminders" below, since this is the one feature that needs a real build rather than Expo Go
 
 ## Structure
 
 ```
-App.js                        entry point; loads fonts, wraps app in AuthProvider, gates login
+App.js                        entry point; loads fonts, registers the notification handler, gates login
 src/theme/colors.js            prototype design tokens + CATEGORY_META
 src/data/mockData.js           catalogue, therapist drops, success stories (from the prototype)
 src/lib/supabase.js            Supabase client (null until keys are set)
 src/lib/fileAccess.js          signed-URL download helper for Storage files
 src/lib/fileUpload.js          staff: pick + upload a file to a Storage bucket
 src/lib/useFamiliesList.js     shared families+child loader (RLS-scoped per role)
+src/lib/useMedications.js      a child's medications + today's dose logs
+src/lib/medicationStatus.js    "overdue / next up / done today" + time formatting
+src/lib/medicationNotifications.js  permission + daily-repeating local notification scheduling
 src/state/AuthContext.js       Supabase session/login state
 src/state/ChildContext.js      parent name + child profile + role/isAdmin/isTherapist (Supabase, or mock)
 src/state/ResourcesContext.js  catalogue loader (Supabase, or mock fallback)
 src/state/CartContext.js       cart + purchases; drives Stripe Checkout, never writes purchases itself
 src/components/                PawIcon, ResourceCard, CategoryBadge, PriceTag, ScreenHeader
-src/screens/                   Auth, Home, Library, ResourceDetail, Cart, ForChild, Profile, KidMode
+src/screens/                   Auth, Home, Library, ResourceDetail, Cart, ForChild, Profile, KidMode,
+                                MedicationForm, MedicationDetail
 src/screens/admin/             Admin, ResourceForm, FamilyDetail, TherapistResourceForm, SuccessStoryForm,
                                 TeamMember, AssignTherapist
 src/screens/therapist/         TherapistHomeScreen — therapist-only landing screen
-src/navigation/RootNavigator.js      bottom tabs + stack for detail, Kid Mode and Admin (family/admin accounts)
+src/navigation/RootNavigator.js      bottom tabs + stack for detail, Kid Mode, Admin and Medications
 src/navigation/TherapistNavigator.js  separate stack for therapist accounts (no consumer tabs)
+eas.json                       development/preview/production build profiles (needed for Medications — see below)
 supabase/schema.sql            database tables + row-level security
 supabase/seed.sql              starter catalogue rows
 supabase/functions/create-checkout-session  Edge Function: starts a Stripe Checkout session
@@ -220,14 +226,61 @@ and edit, but never remove a resource, purchase, or private content item. For
 the rare case you need to delete something, use the Supabase table editor (as
 project owner, which bypasses all of this).
 
+## Medications and reminders
+
+Every family can track medications for their child on the **Medications** tab
+of **For [Child]**: add a medication with one or more daily dose times, log
+each dose as given or skipped, and see a status badge (overdue / next up /
+done today) at a glance. This is strictly private to the family — not visible
+to admins or therapists, same as the child's own profile.
+
+**Reminders need a real build, not Expo Go.** Everything above (adding
+medications, logging doses, seeing status) works immediately in Expo Go, same
+as the rest of the app — but the actual reminder *alerts*, which need to fire
+even when the app is closed, use the phone's own notification scheduler
+(`expo-notifications`), and recent Expo Go versions no longer support that.
+You'll need a one-time **development build** instead — a real version of the
+app with your own icon that you install once, after which you keep using
+`npx expo start` and your usual workflow exactly as before (just opening that
+app instead of Expo Go to test).
+
+1. Re-run `supabase/schema.sql` as usual (adds the `medications` and
+   `medication_logs` tables).
+2. On your PC: `git pull`, then `npm install` (two new packages this time:
+   `expo-notifications` and a native time picker).
+3. Install the EAS CLI the same way Stripe setup did: prefix commands with
+   `npx eas-cli@latest` instead of `eas` (or install it permanently with
+   `npm install -g eas-cli`).
+4. Build a development client for your phone's platform:
+   ```
+   npx eas-cli@latest build --profile development --platform android
+   ```
+   (use `--platform ios` for iPhone). The first time, it'll prompt you to log
+   in (same account as before) and to create/link an EAS project for this
+   app — just accept the defaults. The build runs in the cloud and takes a
+   few minutes; when it's done you'll get a link/QR code to install it
+   directly on your phone (Android: installs like any app; iPhone: needs your
+   phone registered first, which the CLI walks you through).
+5. From now on: `npx expo start` as always, but open the **Pawsitive Kids**
+   dev client app you just installed (not Expo Go) to scan the QR code —
+   everything else about your workflow stays the same.
+6. Open the Medications tab and add a medication with a dose time a couple of
+   minutes from now — you'll get an iOS/Android permission prompt the first
+   time, then the reminder should pop up right on schedule, even if you close
+   the app.
+
+You only need to repeat the `eas build` step if a future feature needs a
+*different* native module — everyday development keeps using `npx expo
+start` exactly as before.
+
 ## Next steps (per the spec)
 
 **V1 is feature-complete against the spec, plus an in-app Admin/Team/therapist
-system.** Auth, one child per family, the live catalogue, real purchases,
-private therapist content, file downloads, paid checkout, and staff content
-management (with proper admin/therapist roles) are all wired up. To test the
-For [Child] screen with sample data, run `supabase/sample_child_content.sql`
-after adding your child.
+system and medication tracking with reminders.** Auth, one child per family,
+the live catalogue, real purchases, private therapist content, file
+downloads, paid checkout, staff content management, and medications are all
+wired up. To test the For [Child] screen with sample data, run
+`supabase/sample_child_content.sql` after adding your child.
 
 From here, per spec §6 ("Not in V1 — revisit later"): therapist
 messaging/booking, subscriptions, and multiple children per family.

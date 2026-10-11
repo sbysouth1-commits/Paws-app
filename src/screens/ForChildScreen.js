@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Award, CalendarDays, Download } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Award, CalendarDays, Download, Pill, Plus, ChevronRight } from 'lucide-react-native';
 import { CATEGORY_META, colors, fonts } from '../theme/colors';
 import { THERAPIST_RESOURCES, SUCCESS_STORIES, family } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { openStorageFile } from '../lib/fileAccess';
+import { useMedications } from '../lib/useMedications';
+import { getMedicationStatus, formatTime } from '../lib/medicationStatus';
+import { resyncMedicationNotifications } from '../lib/medicationNotifications';
 import { useChild } from '../state/ChildContext';
 import ScreenHeader from '../components/ScreenHeader';
 import PawIcon from '../components/PawIcon';
@@ -95,12 +99,82 @@ function SuccessStoryCard({ story }) {
   );
 }
 
-export default function ForChildScreen() {
+const STATUS_TONE_STYLE = {
+  overdue: { backgroundColor: '#B3261E1A', color: '#B3261E' },
+  upcoming: { backgroundColor: colors.sageLight, color: colors.sage },
+  done: { backgroundColor: colors.line, color: colors.inkSoft },
+  none: { backgroundColor: colors.line, color: colors.inkSoft },
+};
+
+function MedicationCard({ medication, onPress, onLogDose, logging }) {
+  const status = getMedicationStatus(medication, medication.logsToday);
+  const tone = STATUS_TONE_STYLE[status.tone] ?? STATUS_TONE_STYLE.none;
+
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      <View style={styles.cardTop}>
+        <View style={[styles.tile, { backgroundColor: colors.sageLight }]}>
+          <Pill size={18} color={colors.ink} />
+        </View>
+        <View style={styles.cardHead}>
+          <Text style={styles.cardTitle}>{medication.name}</Text>
+          <Text style={styles.cardMeta}>
+            {medication.dosage ? `${medication.dosage} · ` : ''}
+            {(medication.times ?? []).map(formatTime).join(', ') || 'No times set'}
+          </Text>
+        </View>
+        <ChevronRight size={16} color={colors.inkSoft} />
+      </View>
+      <View style={styles.medicationRow}>
+        <View style={[styles.statusBadge, { backgroundColor: tone.backgroundColor }]}>
+          <Text style={[styles.statusBadgeText, { color: tone.color }]}>{status.label}</Text>
+        </View>
+        {status.tone !== 'done' && status.tone !== 'none' ? (
+          <Pressable
+            onPress={onLogDose}
+            disabled={logging}
+            style={({ pressed }) => [styles.logButton, (pressed || logging) && styles.pressed]}
+          >
+            {logging ? (
+              <ActivityIndicator color={colors.white} size="small" />
+            ) : (
+              <Text style={styles.logButtonText}>Log dose</Text>
+            )}
+          </Pressable>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+export default function ForChildScreen({ navigation }) {
   const { child, childName } = useChild();
   const [tab, setTab] = useState('resources');
   const [resources, setResources] = useState(isSupabaseConfigured ? [] : THERAPIST_RESOURCES);
   const [stories, setStories] = useState(isSupabaseConfigured ? [] : SUCCESS_STORIES);
   const [loading, setLoading] = useState(isSupabaseConfigured);
+  const { medications, loading: medicationsLoading, reload: reloadMedications } = useMedications(child?.id);
+  const [loggingId, setLoggingId] = useState(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      reloadMedications();
+    }, [reloadMedications])
+  );
+
+  // Keep the device's scheduled reminders in sync whenever the medications
+  // list changes (added, edited, deactivated, or a log shifts "done today").
+  useEffect(() => {
+    if (medications.length === 0) return;
+    resyncMedicationNotifications(childName, medications);
+  }, [medications, childName]);
+
+  const handleLogDose = async (medication) => {
+    setLoggingId(medication.id);
+    await supabase.from('medication_logs').insert({ medication_id: medication.id, status: 'given' });
+    await reloadMedications();
+    setLoggingId(null);
+  };
 
   useEffect(() => {
     if (!isSupabaseConfigured || !child?.id) return;
@@ -153,11 +227,24 @@ export default function ForChildScreen() {
   const tabs = [
     { key: 'resources', label: `From ${therapistName}` },
     { key: 'stories', label: 'Success Stories' },
+    { key: 'medications', label: 'Medications' },
   ];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScreenHeader title={`For ${childName}`} />
+      <ScreenHeader
+        title={`For ${childName}`}
+        right={
+          tab === 'medications' ? (
+            <Pressable
+              onPress={() => navigation.navigate('MedicationForm', { childId: child?.id })}
+              style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+            >
+              <Plus size={18} color={colors.white} />
+            </Pressable>
+          ) : null
+        }
+      />
 
       <View style={styles.segmentWrap}>
         <View style={styles.segment}>
@@ -179,29 +266,56 @@ export default function ForChildScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {loading ? (
+        {tab === 'resources' ? (
+          loading ? (
+            <ActivityIndicator color={colors.ink} style={styles.loader} />
+          ) : (
+            <>
+              <Text style={styles.intro}>
+                Resources {therapistName} has shared just for {childName} — these aren't in the
+                general library.
+              </Text>
+              {resources.length === 0 ? (
+                <Text style={styles.empty}>Nothing shared yet — check back soon.</Text>
+              ) : (
+                resources.map((r) => <TherapistResourceCard key={r.id} resource={r} />)
+              )}
+            </>
+          )
+        ) : tab === 'stories' ? (
+          loading ? (
+            <ActivityIndicator color={colors.ink} style={styles.loader} />
+          ) : (
+            <>
+              <Text style={styles.intro}>
+                Wins and milestones {therapistName} has noted for {childName} along the way.
+              </Text>
+              {stories.length === 0 ? (
+                <Text style={styles.empty}>No stories yet — they'll appear here.</Text>
+              ) : (
+                stories.map((s) => <SuccessStoryCard key={s.id} story={s} />)
+              )}
+            </>
+          )
+        ) : medicationsLoading ? (
           <ActivityIndicator color={colors.ink} style={styles.loader} />
-        ) : tab === 'resources' ? (
-          <>
-            <Text style={styles.intro}>
-              Resources {therapistName} has shared just for {childName} — these aren't in the
-              general library.
-            </Text>
-            {resources.length === 0 ? (
-              <Text style={styles.empty}>Nothing shared yet — check back soon.</Text>
-            ) : (
-              resources.map((r) => <TherapistResourceCard key={r.id} resource={r} />)
-            )}
-          </>
         ) : (
           <>
             <Text style={styles.intro}>
-              Wins and milestones {therapistName} has noted for {childName} along the way.
+              {childName}'s medications, with reminders at each scheduled dose time.
             </Text>
-            {stories.length === 0 ? (
-              <Text style={styles.empty}>No stories yet — they'll appear here.</Text>
+            {medications.length === 0 ? (
+              <Text style={styles.empty}>No medications added yet — tap + to add one.</Text>
             ) : (
-              stories.map((s) => <SuccessStoryCard key={s.id} story={s} />)
+              medications.map((m) => (
+                <MedicationCard
+                  key={m.id}
+                  medication={m}
+                  logging={loggingId === m.id}
+                  onPress={() => navigation.navigate('MedicationDetail', { medicationId: m.id, childName })}
+                  onLogDose={() => handleLogDose(m)}
+                />
+              ))
             )}
           </>
         )}
@@ -216,6 +330,31 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.9 },
   loader: { marginTop: 40 },
   empty: { fontFamily: fonts.body, fontSize: 14, color: colors.inkSoft, marginTop: 8 },
+
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  medicationRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  statusBadgeText: { fontFamily: fonts.bodySemiBold, fontSize: 12 },
+  logButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: colors.ink,
+  },
+  logButtonText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.white },
 
   segmentWrap: { paddingHorizontal: 20, marginBottom: 16 },
   segment: {

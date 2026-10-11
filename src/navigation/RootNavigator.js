@@ -21,6 +21,8 @@ import TherapistResourceFormScreen from '../screens/admin/TherapistResourceFormS
 import SuccessStoryFormScreen from '../screens/admin/SuccessStoryFormScreen';
 import TeamMemberScreen from '../screens/admin/TeamMemberScreen';
 import AssignTherapistScreen from '../screens/admin/AssignTherapistScreen';
+import MedicationFormScreen from '../screens/MedicationFormScreen';
+import MedicationDetailScreen from '../screens/MedicationDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -134,6 +136,10 @@ export default function RootNavigator() {
           component={AssignTherapistScreen}
           options={{ title: '' }}
         />
+
+        {/* Medications — reachable from the For [Child] screen's Medications tab. */}
+        <Stack.Screen name="MedicationForm" component={MedicationFormScreen} options={{ title: '' }} />
+        <Stack.Screen name="MedicationDetail" component={MedicationDetailScreen} options={{ title: '' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

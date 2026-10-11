@@ -2,6 +2,7 @@ import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
+import * as Notifications from 'expo-notifications';
 import { Fraunces_600SemiBold, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 import {
   PublicSans_400Regular,
@@ -19,6 +20,18 @@ import { ResourcesProvider } from './src/state/ResourcesContext';
 import { AuthProvider, useAuth } from './src/state/AuthContext';
 import { ChildProvider, useChild } from './src/state/ChildContext';
 import { colors } from './src/theme/colors';
+
+// Medication reminders should still pop up while the app is open, not just
+// when it's backgrounded — this is read once at module load, not tied to any
+// screen's lifecycle.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 function Loading() {
   return (
